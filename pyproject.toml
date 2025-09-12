@@ -71,7 +71,7 @@ semver = "==3.0.2"
 pipreqs = "==0.4.13"
 
 [tool.isort]
-line_length = 88
+line_length = 140
 indent = "    "
 multi_line_output = 3
 include_trailing_comma = true
@@ -80,8 +80,8 @@ use_parentheses = true
 known_first_party = ["thc_devops_toolkit"]
 
 [tool.black]
-line-length = 88
-target-version = ["py310", "py311", "py312", "py313"]
+line-length = 140
+target-version = ["py310", "py311", "py312"]
 
 [tool.pylint."MESSAGES CONTROL"]
 disable = "bad-continuation,duplicate-code,too-few-public-methods,useless-import-alias"
@@ -98,12 +98,12 @@ ignore_missing_imports = true
 strict = true
 
 [tool.docformatter]
-wrap-summaries = 88
-wrap-descriptions = 88
+wrap-summaries = 140
+wrap-descriptions = 140
 
 [tool.ruff]
 target-version = "py310"
-line-length = 88
+line-length = 140
 select = ["D", "E", "F", "W", "B", "ISC", "C4", "UP"]
 fixable = ["D", "E", "F", "W", "B", "ISC", "C4", "UP"]
 ignore = ["B024", "B027"]

@@ -27,7 +27,7 @@ python -m mypy src/thc_devops_toolkit
 echo "- mypy: done"
 
 echo "- pylint: start"
-python -m pylint src/thc_devops_toolkit
+python -m pylint --max-line-length=140 src/thc_devops_toolkit
 echo "- pylint: done"
 
 echo "- flake8: start"
