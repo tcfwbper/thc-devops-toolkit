@@ -1,0 +1,135 @@
+[build-system]
+requires = ["poetry-core>=1.4.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "thc_devops_toolkit"
+version = "1.0.0"
+description = "thc_devops_toolkit: A toolkit for DevOps and other projects."
+authors = ["pesci861207@gmail.com"]
+readme = "README.md"
+keywords = [
+    "devops",
+    "infrastructure",
+    "containerization",
+    "toolkit",
+    "utils",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: IT Engineers",
+    "Intended Audience :: Science/Research",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Software Development",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
+packages = [
+    { include = "thc_devops_toolkit", from = "src" }
+]
+exclude = [
+    "src/**/test_*.py"
+]
+
+[tool.poetry.scripts]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+# Mandatory dependencies
+"ruamel.yaml" = "^0.18.11"
+tabulate = "^0.9.0"
+pandas = "^2.2.3"
+
+[tool.poetry.group.dev.dependencies]
+types-dataclasses = "==0.6.6"
+types-requests = "==2.31.0.2"
+types-setuptools = "==68.2.0.0"
+setuptools = "==75.8.2"
+mypy = "==1.6.1"
+isort = "==5.12.0"
+black = { version = "==23.10.1", extras = ["jupyter"] }
+docformatter = "==1.7.5"
+pylint = "==2.13.9"
+flake8 = "==5.0.4"
+ruff = "==0.1.4"
+pytest = "==7.4.3"
+pytest-cov = "==4.1.0"
+pytest-mock = "^3.14.1"
+rope = "==1.11.0"
+semver = "==3.0.2"
+pipreqs = "==0.4.13"
+
+[tool.isort]
+line_length = 88
+indent = "    "
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+known_first_party = ["thc_devops_toolkit"]
+
+[tool.black]
+line-length = 88
+target-version = ["py310", "py311", "py312", "py313"]
+
+[tool.pylint."MESSAGES CONTROL"]
+disable = "bad-continuation,duplicate-code,too-few-public-methods,useless-import-alias"
+
+[tool.pytest.ini_options]
+minversion = "6.2"
+addopts = "-qq"
+testpaths = [
+    "src/thc_devops_toolkit",
+]
+
+[tool.mypy]
+ignore_missing_imports = true
+strict = true
+
+[tool.docformatter]
+wrap-summaries = 88
+wrap-descriptions = 88
+
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+select = ["D", "E", "F", "W", "B", "ISC", "C4", "UP"]
+fixable = ["D", "E", "F", "W", "B", "ISC", "C4", "UP"]
+ignore = ["B024", "B027"]
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+    "proto",
+]
+
+[tool.ruff.pydocstyle]
+convention = "google"
