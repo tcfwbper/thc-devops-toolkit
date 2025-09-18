@@ -35,7 +35,7 @@ python -m flake8 src/thc_devops_toolkit
 echo "- flake8: done"
 
 echo "- pytest: start"
-python -m pytest --cov=src/thc_devops_toolkit --disable-warnings
+python -m pytest test --cov=src/thc_devops_toolkit --disable-warnings
 echo "- pytest: done"
 
 echo "- All Python checks passed"
