@@ -12,4 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""THC DevOps Toolkit: A collection of utilities for DevOps tasks."""
+"""A collection of utilities for infrastructure tasks."""
