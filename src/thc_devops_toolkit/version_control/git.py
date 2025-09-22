@@ -226,7 +226,7 @@ def get_git_remote_url(remote_name: str = "origin") -> str:
     return process.stdout.decode("utf-8").strip()
 
 
-def git_set_remote_url(new_url: str, remote_name: str = "origin") -> None:
+def set_git_remote_url(new_url: str, remote_name: str = "origin") -> None:
     """Sets the URL of a Git remote.
 
     Args:
