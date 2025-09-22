@@ -26,18 +26,24 @@ def parse_key_path(key_path: str) -> list[str | int]:
     """Parses a key path string into a list of keys and indices.
 
     Args:
-        key_path (str): The key path string (e.g., 'foo.bar[0].baz').
+        key_path (str): The key path string (e.g., 'foo.bar[0].baz', "foo.'complex.key'.baz").
 
     Returns:
         list[str | int]: List of keys and indices.
     """
     logger.debug("Parsing key path: %s", key_path)
     tokens = []
+
+    # Pattern to match:
+    # - Single quoted keys: 'key'
+    # - Double quoted keys: "key"
+    # - Plain keys: key
+    # - Array indices: [0][1][2]
     pattern = re.compile(
         r"""
         (?:
-            '([^']+)'           # group 1: single-quoted key
-            | "([^"]+)"         # group 2: double-quoted key
+            '([^']*)'           # group 1: single-quoted key (allows empty)
+            | "([^"]*)"         # group 2: double-quoted key (allows empty)
             | ([a-zA-Z0-9_\-]+) # group 3: plain key
         )
         ((?:\[\d+\])*)          # group 4: array indices
@@ -45,23 +51,39 @@ def parse_key_path(key_path: str) -> list[str | int]:
         re.VERBOSE,
     )
 
-    for part in key_path.split("."):
-        match_ = pattern.fullmatch(part)
+    pos = 0
+    while pos < len(key_path):
+        # Skip dots
+        while pos < len(key_path) and key_path[pos] == ".":
+            pos += 1
+
+        if pos >= len(key_path):
+            break
+
+        # Find the next component
+        match_ = pattern.match(key_path, pos)
         if not match_:
-            logger.error("Invalid key_path part: %s", part)
-            raise ValueError(f"Invalid key_path part: {part}")
-        # quoted key
-        if match_.group(1) is not None:
+            logger.error("Invalid key_path at position %d: %s", pos, key_path[pos:])
+            raise ValueError(f"Invalid key_path at position {pos}: {key_path[pos:]}")
+
+        # Extract the key
+        if match_.group(1) is not None:  # single-quoted
             tokens.append(match_.group(1))
-        elif match_.group(2) is not None:
+        elif match_.group(2) is not None:  # double-quoted
             tokens.append(match_.group(2))
-        # plain key
-        elif match_.group(3) is not None:
+        elif match_.group(3) is not None:  # plain key
             tokens.append(match_.group(3))
-        # array indices
-        indices = re.findall(r"\[(\d+)\]", match_.group(4))
-        for idx in indices:
-            tokens.append(int(idx))
+
+        # Extract array indices
+        indices_str = match_.group(4)
+        if indices_str:
+            indices = re.findall(r"\[(\d+)\]", indices_str)
+            for idx in indices:
+                tokens.append(int(idx))
+
+        # Move to the end of this match
+        pos = match_.end()
+
     logger.debug("Parsed tokens: %r", tokens)
     return tokens
 
@@ -80,7 +102,11 @@ def get_value_from_dict(dictionary: dict[str, Any], key_path: str) -> tuple[Any,
     tokens = parse_key_path(key_path)
     dict_iter: Any = dictionary
     for token in tokens:
-        if not dict_iter.__contains__(token):
+        if isinstance(dict_iter, list):
+            if not isinstance(token, int) or token >= len(dict_iter):
+                logger.warning("Invalid index %s for %s", token, dict_iter)
+                return None, False
+        elif token not in dict_iter:
             logger.warning("Key %s not found in values.yaml", key_path)
             return None, False
         dict_iter = dict_iter[token]
