@@ -57,7 +57,7 @@ def trivy_scan(cr_host: str, image_name: str, image_tag: str, output_file: str |
     full_image_name = f"{cr_host}/{image_name}:{image_tag}"
     output_file = str(Path(output_file).with_suffix(".json"))
     cmd = ["trivy", "image", "--timeout", "60m", "--format", "json", "-o", output_file, full_image_name]
-    process = subprocess.run(cmd, capture_output=True)
+    process = subprocess.run(cmd, capture_output=True, check=True)
     if process.returncode != 0:
         raise RuntimeError(f"Failed to scan image: {full_image_name} (exit code: {process.returncode}){str(process.stderr, 'UTF-8')}")
     logger.info("Trivy scan completed for image: %s", full_image_name)
@@ -85,7 +85,7 @@ def trivy_convert(input_path: str | Path, output_path: str | Path, template: str
         raise FileNotFoundError(f"Template not found: {template_filename}") from exception
 
     cmd = ["trivy", "convert", "--format", "template", "--template", template_path, "-o", output_path, input_path]
-    process = subprocess.run(cmd, capture_output=True)
+    process = subprocess.run(cmd, capture_output=True, check=True)
     if process.returncode != 0:
         raise RuntimeError(
             f"Failed to convert trivy template: {input_path} (exit code: {process.returncode}){str(process.stderr, 'UTF-8')}"
