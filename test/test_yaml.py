@@ -17,6 +17,14 @@ from thc_devops_toolkit.utils import yaml as yaml_mod
 def test_parse_key_path(key_path, expected):
     assert yaml_mod.parse_key_path(key_path) == expected
 
+def test_parse_key_path_invalid():
+    with pytest.raises(ValueError):
+        yaml_mod.parse_key_path("foo.bar[")
+    with pytest.raises(ValueError):
+        yaml_mod.parse_key_path("foo.bar[abc]")
+    with pytest.raises(ValueError):
+        yaml_mod.parse_key_path("foo..[0]")
+
 @pytest.fixture
 def nested_dict():
     return {
@@ -56,6 +64,11 @@ def test_get_value_from_dict_not_found(nested_dict):
     assert not ok
     assert val is None
 
+def test_get_value_from_dict_list_index_out_of_range(nested_dict):
+    val, ok = yaml_mod.get_value_from_dict(nested_dict, "foo.bar[10].baz")
+    assert not ok
+    assert val is None
+
 def test_set_value_to_dict_simple(nested_dict):
     yaml_mod.set_value_to_dict(nested_dict, "foo.simple", 100)
     assert nested_dict["foo"]["simple"] == 100
@@ -63,3 +76,21 @@ def test_set_value_to_dict_simple(nested_dict):
 def test_set_value_to_dict_nested(nested_dict):
     yaml_mod.set_value_to_dict(nested_dict, "foo.bar", [{"baz": 10}])
     assert nested_dict["foo"]["bar"] == [{"baz": 10}]
+
+def test_set_value_to_dict_extend_list():
+    d = {"foo": [1]}
+    yaml_mod.set_value_to_dict(d, "foo[2]", 99)
+    assert d["foo"] == [1, None, 99]
+
+def test_set_value_to_dict_type_error():
+    d = {"foo": {}}
+    with pytest.raises(ValueError):
+        yaml_mod.set_value_to_dict(d, "foo[0]", 1)
+    d = {"foo": []}
+    with pytest.raises(ValueError):
+        yaml_mod.set_value_to_dict(d, "foo.bar", 1)
+
+def test_set_value_to_dict_list_element():
+    d = {"foo": [10, 20, 30]}
+    yaml_mod.set_value_to_dict(d, "foo[1]", 99)
+    assert d["foo"][1] == 99
