@@ -20,6 +20,9 @@ from pathlib import Path
 
 from minio import Minio, S3Error
 
+# Set up a default logger for this module
+logger = logging.getLogger(__name__)
+
 
 def get_minio_service(
     s3_server: str,
@@ -57,18 +60,22 @@ def minio_makedir(minio_: Minio, bucket: str, directory: str | Path | None = Non
     """
     if not minio_.bucket_exists(bucket):
         minio_.make_bucket(bucket)
+        logger.debug(
+            "Bucket %s created",
+            bucket,
+        )
     if directory:
         dir_path = str(directory) + "/"
         try:
             minio_.stat_object(bucket, dir_path)
         except S3Error:
             # Directory doesn't exist, create it
-            logging.debug(
-                "Creating directory %s in bucket %s",
+            minio_.put_object(bucket, dir_path, BytesIO(b""), 0)
+            logger.debug(
+                "Directory %s in bucket %s created",
                 dir_path,
                 bucket,
             )
-            minio_.put_object(bucket, dir_path, BytesIO(b""), 0)
 
 
 def minio_removedir(minio_: Minio, bucket: str, directory: str | Path | None = None) -> None:
@@ -87,6 +94,11 @@ def minio_removedir(minio_: Minio, bucket: str, directory: str | Path | None = N
             minio_.remove_object(bucket, obj.object_name)
     if directory is None:
         minio_.remove_bucket(bucket)
+    target_path = f"{bucket}/{prefix}" if prefix else bucket
+    logger.debug(
+        "Target directory %s removed",
+        target_path,
+    )
 
 
 def mirror_dir_to_bucket(
@@ -118,3 +130,9 @@ def mirror_dir_to_bucket(
             else:
                 object_name = str(file_path.relative_to(source))
             minio_.fput_object(bucket, object_name, str(file_path))
+    destination = f"{bucket}/{directory}" if directory else str(bucket)
+    logger.debug(
+        "Local directory %s copied to %s",
+        source,
+        destination,
+    )
