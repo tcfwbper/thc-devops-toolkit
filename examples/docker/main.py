@@ -46,7 +46,7 @@ tmp_tag = "tmp"
 full_image_name = f"{cr_host}/{image_name}:{image_tag}"
 container_name = "my_busybox"
 
-docker_example_dir = main_path = Path(__file__).resolve().parent
+docker_example_dir = Path(__file__).resolve().parent
 dockerfile_path = docker_example_dir / "Dockerfile"
 
 

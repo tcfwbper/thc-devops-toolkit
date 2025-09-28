@@ -21,7 +21,7 @@ cr_host = "docker.io"
 image_name = "busybox"
 image_tag = "latest"
 
-mend_example_dir = main_path = Path(__file__).resolve().parent
+mend_example_dir = Path(__file__).resolve().parent
 json_output_file = mend_example_dir / "trivy_output.json"
 yaml_output_file = mend_example_dir / "trivy_output.yaml"
 html_output_file = mend_example_dir / "trivy_output.html"
