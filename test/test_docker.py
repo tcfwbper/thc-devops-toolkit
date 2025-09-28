@@ -112,12 +112,26 @@ def test_docker_run_daemon_fail(mock_run):
         docker_mod.docker_run_daemon("repo/image:tag")
 
 @patch("subprocess.run")
-def test_docker_stop_success(mock_run):
+@patch("thc_devops_toolkit.containerization.docker.docker_inspect")
+def test_docker_stop_success(mock_inspect, mock_run):
     mock_run.return_value = MagicMock(returncode=0)
-    docker_mod.docker_stop("cname")
+    mock_inspect.side_effect = [
+        {"State": {"Status": "running"}},
+        {"State": {"Status": "exited"}}
+    ]
+    docker_mod.docker_stop("cname", timeout=2, poll_interval=0.01)
     mock_run.assert_called_once()
     args = mock_run.call_args[0][0]
     assert args == ["docker", "stop", "cname"]
+    assert mock_inspect.call_count >= 2
+
+@patch("subprocess.run")
+@patch("thc_devops_toolkit.containerization.docker.docker_inspect")
+def test_docker_stop_timeout(mock_inspect, mock_run):
+    mock_run.return_value = MagicMock(returncode=0)
+    mock_inspect.return_value = {"State": {"Status": "running"}}
+    with pytest.raises(RuntimeError):
+        docker_mod.docker_stop("cname", timeout=0.05, poll_interval=0.01)
 
 @patch("subprocess.run")
 def test_docker_stop_fail(mock_run):
@@ -126,12 +140,26 @@ def test_docker_stop_fail(mock_run):
         docker_mod.docker_stop("cname")
 
 @patch("subprocess.run")
-def test_docker_remove_success(mock_run):
+@patch("thc_devops_toolkit.containerization.docker.docker_inspect")
+def test_docker_remove_success(mock_inspect, mock_run):
     mock_run.return_value = MagicMock(returncode=0)
-    docker_mod.docker_remove("cname")
+    mock_inspect.side_effect = [
+        {},
+        Exception("not found")
+    ]
+    docker_mod.docker_remove("cname", timeout=2, poll_interval=0.01)
     mock_run.assert_called_once()
     args = mock_run.call_args[0][0]
     assert args == ["docker", "rm", "cname"]
+    assert mock_inspect.call_count >= 2
+
+@patch("subprocess.run")
+@patch("thc_devops_toolkit.containerization.docker.docker_inspect")
+def test_docker_remove_timeout(mock_inspect, mock_run):
+    mock_run.return_value = MagicMock(returncode=0)
+    mock_inspect.return_value = {}
+    with pytest.raises(RuntimeError):
+        docker_mod.docker_remove("cname", timeout=0.05, poll_interval=0.01)
 
 @patch("subprocess.run")
 def test_docker_remove_fail(mock_run):
@@ -140,6 +168,20 @@ def test_docker_remove_fail(mock_run):
         docker_mod.docker_remove("cname")
     # ignore_errors True should not raise
     docker_mod.docker_remove("cname", ignore_errors=True)
+
+@patch("subprocess.run")
+def test_docker_remove_image_success(mock_run):
+    mock_run.return_value = MagicMock(returncode=0)
+    docker_mod.docker_remove_image("repo/image:tag")
+    mock_run.assert_called_once()
+    args = mock_run.call_args[0][0]
+    assert args == ["docker", "rmi", "repo/image:tag"]
+
+@patch("subprocess.run")
+def test_docker_remove_image_fail(mock_run):
+    mock_run.return_value = MagicMock(returncode=1, stderr=b"fail")
+    with pytest.raises(RuntimeError):
+        docker_mod.docker_remove_image("repo/image:tag")
 
 @patch("subprocess.run")
 def test_docker_copy_success(mock_run):
