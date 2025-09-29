@@ -47,9 +47,6 @@ def main() -> None:
 
     password = getpass.getpass("GitHub personal access token: ")
 
-    cwd = os.getcwd()
-    os.chdir(git_example_dir)
-
     git_credential = GitCredential(user=username, token=password)
     git_repo = GitRepo(
         git_credential=git_credential,
@@ -84,7 +81,6 @@ def main() -> None:
 
     shutil.rmtree(local_repo_path, ignore_errors=True)
     shutil.rmtree(local_repo_path_tmp, ignore_errors=True)
-    os.chdir(cwd)
 
 
 if __name__ == "__main__":
