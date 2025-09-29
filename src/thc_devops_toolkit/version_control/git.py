@@ -155,6 +155,28 @@ class GitRepo:
 
         logger.info("Successfully got git remotes")
 
+    def init(self) -> None:
+        """Initializes a new Git repository at the local path.
+
+        Raises:
+            RuntimeError: If git init fails.
+        """
+        logger.info("Initializing new git repo at %s", self.local_path)
+
+        repo_path = Path(self.local_path)
+        if not repo_path.is_dir():
+            repo_path.mkdir(parents=True)
+
+        cmd = ["git", "init"]
+        process = subprocess.run(cmd, cwd=self.local_path, capture_output=True, check=True)
+
+        if process.returncode != 0:
+            logger.error("Failed to initialize git repo (exit code: %d)", process.returncode)
+            raise RuntimeError(f"Failed to initialize git repo (exit code: {process.returncode})")
+
+        self._set_config()
+        logger.info("Successfully initialized git repo at %s", self.local_path)
+
     def clone(self, branch: str = "main") -> None:
         """Clones a Git repository using the provided PAT format URL and branch.
 

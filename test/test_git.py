@@ -211,3 +211,22 @@ def test_push_fail(mock_run, git_repo):
     git_repo.local_path = "."
     with pytest.raises(RuntimeError):
         git_repo.push(branch="main")
+
+@patch("subprocess.run")
+def test_init_success(mock_run, git_credential, email, repo_url, tmp_path):
+    mock_run.return_value = MagicMock(returncode=0)
+    local_path = str(tmp_path / "repo")
+    repo = GitRepo(git_credential, email, repo_url, local_path)
+    with patch.object(GitRepo, "_set_config") as mock_set_config:
+        repo.init()
+        mock_set_config.assert_called_once()
+    args = mock_run.call_args_list[0][0][0]
+    assert args == ["git", "init"]
+
+@patch("subprocess.run")
+def test_init_fail(mock_run, git_credential, email, repo_url, tmp_path):
+    mock_run.return_value = MagicMock(returncode=1)
+    local_path = str(tmp_path / "repo")
+    repo = GitRepo(git_credential, email, repo_url, local_path)
+    with pytest.raises(RuntimeError):
+        repo.init()
