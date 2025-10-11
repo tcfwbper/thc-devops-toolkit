@@ -42,10 +42,7 @@ def main() -> None:
         {"Project": "DEVPOD", "Owner": "Pesci Chang"},
     ]
     dataframe = pd.DataFrame(sample_data)
-    table = MarkdownTable(
-        table_id="my_projects",
-        dataframe=dataframe
-    )
+    table = MarkdownTable(table_id="my_projects", dataframe=dataframe)
     logger.info(f"Created table with {len(dataframe)} rows and columns: {list(dataframe.columns)}")
 
     # Update markdown file
@@ -57,16 +54,14 @@ def main() -> None:
     doc_manager.lines.append("- There are some useful projects.")
     doc_manager.lines.append("- Welcome to pull and contribute.")
     logger.info(f"Document now has {len(doc_manager.lines)} lines")
-    
+
     # Update an existing project or insert a new project
-    table.upsert_row(
-        data={"Project": "DEVPOD", "Owner": "Tsung-Han Chang"},
-        primary_key="Project"
-    )
+    table.upsert_row(data={"Project": "DEVPOD", "Owner": "Tsung-Han Chang"}, primary_key="Project")
 
     # Save the document
     doc_manager.save_document()
     logger.info(f"Document saved to {md_file}")
+
 
 if __name__ == "__main__":
     main()
