@@ -106,6 +106,25 @@ def test_docker_run_daemon_success(mock_run):
     assert "echo" in args
 
 @patch("subprocess.run")
+def test_docker_run_daemon_with_env_and_ports(mock_run):
+    mock_run.return_value = MagicMock(returncode=0, stdout=b"containerid\n")
+    cid = docker_mod.docker_run_daemon(
+        "repo/image:tag", 
+        env_vars=["VAR1=value1", "VAR2=value2"], 
+        port_mappings=["8080:80", "3000:3000"]
+    )
+    mock_run.assert_called_once()
+    assert cid == "containerid"
+    args = mock_run.call_args[0][0]
+    assert "-d" in args
+    assert "-e" in args
+    assert "VAR1=value1" in args
+    assert "VAR2=value2" in args
+    assert "-p" in args
+    assert "8080:80" in args
+    assert "3000:3000" in args
+
+@patch("subprocess.run")
 def test_docker_run_daemon_fail(mock_run):
     mock_run.return_value = MagicMock(returncode=1, stderr=b"fail")
     with pytest.raises(RuntimeError):

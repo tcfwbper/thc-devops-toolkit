@@ -166,12 +166,14 @@ def docker_tag(
     logger.info("Successfully tagged Docker image: %s", target_full_image_name)
 
 
-def docker_run_daemon(
+def docker_run_daemon(  # pylint: disable=too-many-arguments
     full_image_name: str,
     remove: bool = False,
     container_name: str | None = None,
     entrypoint: str | None = None,
     command: list[str] | None = None,
+    env_vars: list[str] | None = None,
+    port_mappings: list[str] | None = None,
 ) -> str:
     """Runs a Docker image in daemon mode (detached container).
 
@@ -181,6 +183,8 @@ def docker_run_daemon(
         container_name (str | None, optional): Name for the container. Defaults to None.
         entrypoint (str | None, optional): Entrypoint override. Defaults to None.
         command (list[str] | None, optional): Command to run. Defaults to None.
+        env_vars (list[str] | None, optional): Environment variables (e.g., ["VAR1=value1", "VAR2=value2"]). Defaults to None.
+        port_mappings (list[str] | None, optional): Port mappings (e.g., ["8080:80", "3000:3000"]). Defaults to None.
 
     Returns:
         str: The container ID.
@@ -194,6 +198,12 @@ def docker_run_daemon(
         cmd.append("--rm")
     if container_name:
         cmd.extend(["--name", container_name])
+    if env_vars:
+        for env_var in env_vars:
+            cmd.extend(["-e", env_var])
+    if port_mappings:
+        for port_mapping in port_mappings:
+            cmd.extend(["-p", port_mapping])
     if entrypoint:
         cmd.extend(["--entrypoint", entrypoint])
     cmd.append(full_image_name)
