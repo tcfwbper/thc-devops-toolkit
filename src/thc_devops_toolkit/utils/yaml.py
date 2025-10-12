@@ -114,6 +114,36 @@ def get_value_from_dict(dictionary: dict[str, Any], key_path: str) -> tuple[Any,
     return dict_iter, True
 
 
+def _get_or_create_next(container: Any, token: str | int, next_token: str | int) -> Any:
+    if isinstance(next_token, int):
+        if token in container:
+            if not isinstance(container[token], list):
+                logger.error("Expected list at %r, got %r", token, type(container[token]))
+                raise ValueError(f"Expected list at {token}, got {type(container[token])}")
+        else:
+            container[token] = []
+    elif isinstance(next_token, str):
+        if token in container:
+            if not isinstance(container[token], dict):
+                logger.error("Expected dict at %r, got %r", token, type(container[token]))
+                raise ValueError(f"Expected dict at {token}, got {type(container[token])}")
+        else:
+            container[token] = {}
+    return container[token]
+
+
+def _set_final_value(container: Any, token: str | int, value: Any) -> None:
+    if isinstance(container, list):
+        if not isinstance(token, int):
+            logger.error("Expected integer index for list, got %r", token)
+            raise ValueError(f"Expected integer index for list, got {token}")
+        while token >= len(container):
+            container.append(None)
+        container[token] = value
+    else:
+        container[token] = value
+
+
 def set_value_to_dict(dictionary: dict[str, Any], key_path: str, value: Any) -> None:
     """Sets a value in a nested dictionary using a key path.
 
@@ -123,9 +153,21 @@ def set_value_to_dict(dictionary: dict[str, Any], key_path: str, value: Any) -> 
         value (Any): The value to set.
     """
     logger.debug("Setting value for key_path: %s to %r", key_path, value)
-    keys = key_path.split(".")
-    dict_iter = dictionary
-    for key in keys[:-1]:
-        dict_iter = dict_iter[key]
-    dict_iter[keys[-1]] = value
+    tokens = parse_key_path(key_path)
+    dict_iter: Any = dictionary
+    for i, token in enumerate(tokens[:-1]):
+        next_token = tokens[i + 1]
+        if isinstance(dict_iter, list):
+            if not isinstance(token, int):
+                logger.error("Expected integer index for list, got %r", token)
+                raise ValueError(f"Expected integer index for list, got {token}")
+            while token >= len(dict_iter):
+                dict_iter.append(None)
+            if dict_iter[token] is None:
+                dict_iter[token] = [] if isinstance(next_token, int) else {}
+            dict_iter = dict_iter[token]
+        else:
+            dict_iter = _get_or_create_next(dict_iter, token, next_token)
+    last_token = tokens[-1]
+    _set_final_value(dict_iter, last_token, value)
     logger.info("Successfully set value for %s to %r", key_path, value)

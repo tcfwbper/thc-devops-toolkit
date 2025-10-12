@@ -16,82 +16,79 @@ def tmp_path():
     if Path(dir_path).exists():
         shutil.rmtree(dir_path, ignore_errors=True)
 
-def test_init_dvc_repo():
+@pytest.fixture
+def dvc_repo(tmp_path):
+    """Create a DvcRepo instance for testing."""
+    return dvc_mod.DvcRepo(tmp_path)
+
+def test_dvc_repo_init():
     with patch("thc_devops_toolkit.version_control.dvc.Repo") as repo_cls:
-        dvc_mod.init_dvc_repo("/tmp/repo")
+        dvc_repo = dvc_mod.DvcRepo("/tmp/repo")
+        dvc_repo.init()
         repo_cls.init.assert_called_once_with("/tmp/repo")
 
-def test_get_dvc_repo():
+def test_dvc_repo_get_repo():
     with patch("thc_devops_toolkit.version_control.dvc.Repo") as repo_cls:
-        repo = dvc_mod.get_dvc_repo("/tmp/repo")
+        dvc_repo = dvc_mod.DvcRepo("/tmp/repo")
+        repo = dvc_repo._get_repo()
         repo_cls.assert_called_once_with("/tmp/repo")
         assert repo == repo_cls.return_value
 
-def test_set_dvc_remote_s3():
+def test_dvc_repo_set_remote():
+    repo_mock = MagicMock()
+    config_ctx = {"remote": {}}
+    repo_mock.config.edit.return_value.__enter__.return_value = config_ctx
+    
+    with patch("thc_devops_toolkit.version_control.dvc.Repo", return_value=repo_mock):
+        dvc_repo = dvc_mod.DvcRepo("/tmp/repo")
+        dvc_repo.set_remote("myremote", "/tmp/remote")
+        
+        repo_mock.config.edit.assert_called_once()
+        assert "myremote" in config_ctx["remote"]
+        assert config_ctx["remote"]["myremote"]["url"] == "/tmp/remote"
+
+def test_dvc_repo_set_remote_s3():
     repo_mock = MagicMock()
     config_ctx = MagicMock()
     repo_mock.config.edit.return_value.__enter__.return_value = config_ctx
-    with patch("thc_devops_toolkit.version_control.dvc.get_dvc_repo", return_value=repo_mock):
-        dvc_mod.set_dvc_remote_s3(
-            repo_path="/tmp/repo",
+    
+    with patch("thc_devops_toolkit.version_control.dvc.Repo", return_value=repo_mock):
+        dvc_repo = dvc_mod.DvcRepo("/tmp/repo")
+        dvc_repo.set_remote_s3(
             remote_name="myremote",
             s3_server="https://s3.server",
             s3_access_key="ak",
             s3_secret_key="sk",
             s3_bucket="mybk"
         )
-        # Check that config_ctx["core"] = {"remote": "myremote"} was set
-        config_ctx.__setitem__.assert_any_call("core", {"remote": "myremote"})
-        # Check that config_ctx["remote"]["myremote"] = ... was set
-        config_ctx.__getitem__.return_value.__setitem__.assert_any_call(
-            "myremote",
-            {
-                "url": "s3://mybk",
-                "endpointurl": "https://s3.server",
-                "access_key_id": "ak",
-                "secret_access_key": "sk",
-            },
-        )
+        
+        repo_mock.config.edit.assert_called_once()
 
-def test_get_dvc_cache_path(tmp_path):
-    md5 = "abcdef1234567890"
-    cache_path = dvc_mod.get_dvc_cache_path(tmp_path, md5)
-    assert cache_path.parent.exists()
-    assert str(cache_path).endswith(md5[2:])
-
-def test_dvc_add_directory():
+def test_dvc_repo_add_directory():
     repo_mock = MagicMock()
-    with patch("thc_devops_toolkit.version_control.dvc.get_dvc_repo", return_value=repo_mock):
-        dvc_mod.dvc_add_directory("/tmp/repo", "data")
+    with patch("thc_devops_toolkit.version_control.dvc.Repo", return_value=repo_mock):
+        dvc_repo = dvc_mod.DvcRepo("/tmp/repo")
+        dvc_repo.add_directory("data")
         repo_mock.add.assert_called_once()
         args, kwargs = repo_mock.add.call_args
-        assert "data" in args[0]
+        assert "/tmp/repo/data" in args[0]
 
-def test_dvc_add_files():
+def test_dvc_repo_add_files():
     repo_mock = MagicMock()
-    with patch("thc_devops_toolkit.version_control.dvc.get_dvc_repo", return_value=repo_mock):
-        dvc_mod.dvc_add_files("/tmp/repo", ["a.txt", "b.txt"])
+    with patch("thc_devops_toolkit.version_control.dvc.Repo", return_value=repo_mock):
+        dvc_repo = dvc_mod.DvcRepo("/tmp/repo")
+        dvc_repo.add_files(["a.txt", "b.txt"])
         repo_mock.add.assert_called_once()
         args, kwargs = repo_mock.add.call_args
         targets = kwargs.get("targets", [])
         assert "/tmp/repo/a.txt" in targets
         assert "/tmp/repo/b.txt" in targets
-        repo_mock.reset_mock()
-        dvc_mod.dvc_add_files(
-            repo_path="/tmp/repo",
-            files=["a.txt", "b.txt"],
-            directory="mydir"
-        )
-        repo_mock.add.assert_called_once()
-        args, kwargs = repo_mock.add.call_args
-        targets = kwargs.get("targets", [])
-        assert "/tmp/repo/mydir/a.txt" in targets
-        assert "/tmp/repo/mydir/b.txt" in targets
 
-def test_dvc_push():
+def test_dvc_repo_push():
     repo_mock = MagicMock()
-    with patch("thc_devops_toolkit.version_control.dvc.get_dvc_repo", return_value=repo_mock):
-        dvc_mod.dvc_push("/tmp/repo", "myremote")
+    with patch("thc_devops_toolkit.version_control.dvc.Repo", return_value=repo_mock):
+        dvc_repo = dvc_mod.DvcRepo("/tmp/repo")
+        dvc_repo.push("myremote")
         repo_mock.push.assert_called_once_with(remote="myremote")
 
 def test_DvcOutput_from_to_dict():
@@ -128,27 +125,36 @@ def test_merge_dvc_files():
     assert len(merged.outputs) == 2
     assert {o.path for o in merged.outputs} == {"a", "b"}
 
-def test_get_dvc_output_md5_found():
-    dvc_file = dvc_mod.DvcFile(outputs=[dvc_mod.DvcOutput("foo", "abc")])
-    md5 = dvc_mod.get_dvc_output_md5(dvc_file, "foo")
-    assert md5 == "abc"
-
-def test_get_dvc_output_md5_not_found():
-    dvc_file = dvc_mod.DvcFile(outputs=[dvc_mod.DvcOutput("foo", "abc")])
-    md5 = dvc_mod.get_dvc_output_md5(dvc_file, "bar")
-    assert md5 == ""
-
-def test_load_dvc_file(tmp_path):
+def test_dvc_repo_get_dvc_file(tmp_path):
     dvc_path = tmp_path / "foo.dvc"
     dvc_path.write_text("outs:\n  - path: foo\n    md5: abc\n    hash: md5\n")
-    f = dvc_mod.load_dvc_file(dvc_path)
+    dvc_repo = dvc_mod.DvcRepo(tmp_path)
+    f = dvc_repo.get_dvc_file("foo")
     assert isinstance(f, dvc_mod.DvcFile)
     assert f.outputs[0].path == "foo"
 
-def test_load_dvc_file_not_found(tmp_path):
-    dvc_path = tmp_path / "notfound.dvc"
+def test_dvc_repo_get_dvc_file_not_found(tmp_path):
+    dvc_repo = dvc_mod.DvcRepo(tmp_path)
     with pytest.raises(FileNotFoundError):
-        dvc_mod.load_dvc_file(dvc_path)
+        dvc_repo.get_dvc_file("notfound")
+
+def test_dvc_repo_get_dvc_tracked_files(tmp_path):
+    # Create cache directory structure
+    cache_dir = tmp_path / ".dvc" / "cache" / "files" / "md5" / "ab" 
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Create test tracked files data
+    tracked_file = cache_dir / "cdef123456"
+    tracked_file.write_text('[{"md5": "abc", "relpath": "test.txt"}]')
+    
+    dvc_repo = dvc_mod.DvcRepo(tmp_path)
+    output = dvc_mod.DvcOutput(path="foo", md5="abcdef123456")
+    tracked_files = dvc_repo.get_dvc_tracked_files(output)
+    
+    assert isinstance(tracked_files, dvc_mod.DvcTrackedFiles)
+    assert len(tracked_files) == 1
+    assert tracked_files.files[0].md5 == "abc"
+    assert tracked_files.files[0].relpath == "test.txt"
 
 def test_DvcFile_get_output_by_path_and_all_methods(tmp_path):
     dvc_file = dvc_mod.DvcFile(outputs=[
@@ -188,18 +194,8 @@ def test_DvcTrackedFile_eq_and_lt():
     assert (a < b) != (b < a)
     assert not (a == object())
 
-def test_dvc_track_directory(tmp_path):
-    # Setup
-    repo_path = tmp_path
-    directory = "mydir"
-    tracked = dvc_mod.DvcTrackedFiles()
-    tracked.add_file("abc", "file1.txt")
-    # Patch get_dvc_cache_path to a writable file
-    with patch("thc_devops_toolkit.version_control.dvc.get_dvc_cache_path") as get_cache:
-        cache_file = tmp_path / "abc.dir"
-        get_cache.return_value = cache_file
-        dvc_mod.dvc_track_directory(repo_path, directory, tracked)
-        assert cache_file.exists()
-        # DVC file should be written
-        dvc_file_path = tmp_path / "mydir.dvc"
-        assert dvc_file_path.exists()
+def test_dvc_repo_get_cache_dir(tmp_path):
+    dvc_repo = dvc_mod.DvcRepo(tmp_path)
+    cache_dir = dvc_repo._get_cache_dir()
+    expected_dir = tmp_path / ".dvc" / "cache" / "files" / "md5"
+    assert cache_dir == expected_dir

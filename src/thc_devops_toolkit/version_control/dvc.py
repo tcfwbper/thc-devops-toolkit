@@ -14,7 +14,6 @@
 # ==============================================================================
 """A collection of utilities for DVC version control tasks."""
 import bisect
-import hashlib
 import json
 import logging
 from collections.abc import Iterator
@@ -86,10 +85,18 @@ class DvcFile:
 
         Returns:
             DvcFile: The loaded DvcFile instance.
+
+        Raises:
+            FileNotFoundError: If the specified file does not exist.
         """
         file_path = Path(file_path)
+
+        if not file_path.is_file():
+            raise FileNotFoundError(f"DVC file not found: {file_path}")
+
         with file_path.open("r", encoding="utf-8") as file:
             data = yaml.load(file, Loader=yaml.FullLoader)
+
         return cls.from_dict(data)
 
     def to_dict(self) -> dict[str, Any]:
@@ -140,6 +147,23 @@ class DvcFile:
             list[str]: List of all MD5 hashes.
         """
         return [output.md5 for output in self.outputs]
+
+
+def merge_dvc_files(
+    dvc_files: list[DvcFile],
+) -> DvcFile:
+    """Merge multiple DVC files into one.
+
+    Args:
+        dvc_files (list[DvcFile]): List of DVC file objects.
+
+    Returns:
+        DvcFile: Merged DVC file object.
+    """
+    merged_outputs = []
+    for dvc_file in dvc_files:
+        merged_outputs.extend(dvc_file.outputs)
+    return DvcFile(outputs=merged_outputs)
 
 
 @dataclass
@@ -292,199 +316,150 @@ class DvcTrackedFiles:
         return iter(self.files)
 
 
-def init_dvc_repo(repo_path: str | Path) -> None:
-    """Initialize a DVC repository.
+class DvcRepo:
+    """DVC repository management."""
 
-    Args:
-        repo_path (str | Path): Path to the DVC repository.
-    """
-    Repo.init(str(repo_path))
-    logger.info("Initialized DVC repository at %s", repo_path)
+    def __init__(self, local_path: str | Path) -> None:
+        """Initialize the DvcRepo.
 
+        Args:
+            local_path (str | Path): Path to the local DVC repository.
+        """
+        self.local_path: Path = Path(local_path)
 
-def get_dvc_repo(repo_path: str | Path) -> Repo:
-    """Get a DVC Repo object for the given path.
+    def init(self) -> None:
+        """Initialize a DVC repository at the local path."""
+        Repo.init(str(self.local_path))
+        logger.info("Initialized DVC repository at %s", self.local_path)
 
-    Args:
-        repo_path (str | Path): Path to the DVC repository.
+    def _get_repo(self) -> Repo:
+        """Get a DVC Repo object for the given path.
 
-    Returns:
-        Repo: The DVC Repo object.
-    """
-    return Repo(str(repo_path))
+        Returns:
+            Repo: The DVC Repo object.
+        """
+        return Repo(str(self.local_path))
 
+    def _get_cache_dir(self) -> Path:
+        """Get the cache path for a given MD5 hash.
 
-def set_dvc_remote_s3(  # pylint: disable=too-many-arguments
-    repo_path: str | Path,
-    remote_name: str,
-    s3_server: str,
-    s3_access_key: str,
-    s3_secret_key: str,
-    s3_bucket: str,
-) -> None:
-    """Set the DVC remote configuration for S3.
+        Returns:
+            Path: The DVC cache directory.
+        """
+        return Path(self.local_path) / ".dvc" / "cache" / "files" / "md5"
 
-    Args:
-        repo_path (str | Path): Path to the DVC repository.
-        remote_name (str): Name of the remote.
-        s3_server (str): S3 server URL.
-        s3_access_key (str): S3 access key.
-        s3_secret_key (str): S3 secret key.
-        s3_bucket (str): S3 bucket for DVC remote storage.
-    """
-    repo = get_dvc_repo(repo_path)
-    remote_dict = {
-        "url": "s3://" + s3_bucket,
-        "endpointurl": s3_server,
-        "access_key_id": s3_access_key,
-        "secret_access_key": s3_secret_key,
-    }
-    with repo.config.edit() as conf:
-        conf["core"] = {"remote": remote_name}
-        conf["remote"][remote_name] = remote_dict
-    logger.info("Set DVC remote '%s' to S3 bucket '%s'", remote_name, s3_bucket)
+    def set_remote(
+        self,
+        remote_name: str,
+        remote_path: str | Path,
+    ) -> None:
+        """Set the DVC remote configuration for a local path.
 
+        Args:
+            remote_name (str): Name of the remote.
+            remote_path (str | Path): Local directory for DVC remote storage.
+        """
+        repo = self._get_repo()
+        remote_path = str(Path(remote_path).resolve())
+        remote_dict = {"url": remote_path}
 
-def get_dvc_cache_path(repo_path: str | Path, md5_hash: str) -> Path:
-    """Get the cache path for a given MD5 hash.
+        with repo.config.edit() as conf:
+            conf["remote"][remote_name] = remote_dict
 
-    Args:
-        repo_path (str | Path): Path to the DVC repository.
-        md5_hash (str): The MD5 hash.
+        logger.info("Set DVC remote '%s' to local path '%s'", remote_name, remote_path)
 
-    Returns:
-        Path: The cache path.
-    """
-    cache_dir = Path(repo_path) / ".dvc" / "cache" / "files" / "md5" / md5_hash[:2]
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    return cache_dir / md5_hash[2:]
+    def set_remote_s3(  # pylint: disable=too-many-arguments
+        self,
+        remote_name: str,
+        s3_server: str,
+        s3_access_key: str,
+        s3_secret_key: str,
+        s3_bucket: str,
+    ) -> None:
+        """Set the DVC remote configuration for S3.
 
+        Args:
+            remote_name (str): Name of the remote.
+            s3_server (str): S3 server URL.
+            s3_access_key (str): S3 access key.
+            s3_secret_key (str): S3 secret key.
+            s3_bucket (str): S3 bucket for DVC remote storage.
+        """
+        repo = self._get_repo()
+        remote_dict = {
+            "url": "s3://" + s3_bucket,
+            "endpointurl": s3_server,
+            "access_key_id": s3_access_key,
+            "secret_access_key": s3_secret_key,
+        }
+        with repo.config.edit() as conf:
+            conf["core"] = {"remote": remote_name}
+            conf["remote"][remote_name] = remote_dict
+        logger.info("Set DVC remote '%s' to S3 bucket '%s'", remote_name, s3_bucket)
 
-def dvc_add_directory(repo_path: str | Path, directory: str | Path) -> None:
-    """Add a directory to DVC tracking.
+    def add_directory(self, directory: str | Path) -> None:
+        """Add a directory to DVC tracking.
 
-    Args:
-        repo_path (str | Path): Path to the DVC repository.
-        directory (str | Path): Directory to add.
-    """
-    repo_path = Path(repo_path)
-    directory = Path(directory)
-    repo = get_dvc_repo(repo_path)
-    repo.add(str(repo_path / directory), force=True)
-    logger.info("Added directory '%s' to DVC tracking", directory)
+        Args:
+            directory (str | Path): Directory to add.
+        """
+        directory = Path(directory)
+        repo = self._get_repo()
+        repo.add(str(self.local_path / directory), force=True)
+        logger.info("Added directory '%s' to DVC tracking", directory)
 
+    def add_files(
+        self,
+        files: list[str | Path],
+    ) -> None:
+        """Add files to DVC tracking.
 
-def dvc_add_files(
-    repo_path: str | Path,
-    files: list[str | Path],
-    directory: str | Path | None = None,
-) -> None:
-    """Add files to DVC tracking.
+        Args:
+            files (list[str | Path]): List of files to add.
+        """
+        full_file_list = [str(self.local_path / file) for file in files]
+        repo = self._get_repo()
+        repo.add(targets=full_file_list)
+        logger.info("Added %d files to DVC tracking", len(files))
 
-    Args:
-        repo_path (str | Path): Path to the DVC repository.
-        files (list[str | Path]): List of files to add.
-        directory (str | Path | None): Directory containing the files.
-    """
-    repo_path = Path(repo_path)
-    if directory:
-        full_file_list = [str(repo_path / directory / file) for file in files]
-    else:
-        full_file_list = [str(repo_path / file) for file in files]
-    repo = get_dvc_repo(repo_path)
-    repo.add(targets=full_file_list)
-    logger.info("Added %d files to DVC tracking", len(files))
+    def get_dvc_file(self, target_path: str | Path) -> DvcFile:
+        """Load a DVC file for a given target path.
 
+        Args:
+            target_path (str | Path): The target file or directory path.
 
-def dvc_push(repo_path: str | Path, remote_name: str) -> None:
-    """Push tracked files to the DVC remote.
+        Returns:
+            DvcFile: The DVC file object.
 
-    Args:
-        repo_path (str | Path): Path to the DVC repository.
-        remote_name (str): Name of the remote.
-    """
-    repo = get_dvc_repo(repo_path)
-    repo.push(remote=remote_name)
-    logger.info("Pushed tracked files to DVC remote '%s'", remote_name)
+        Raises:
+            FileNotFoundError: If the DVC file does not exist.
+        """
+        dvc_file_path = (self.local_path / target_path).with_suffix(".dvc")
+        if not dvc_file_path.is_file():
+            raise FileNotFoundError(f"DVC file not found: {dvc_file_path}")
+        return DvcFile.from_yaml_file(dvc_file_path)
 
+    def get_dvc_tracked_files(self, dvc_output: DvcOutput) -> DvcTrackedFiles:
+        """Load the tracked files for a given DVC output.
 
-def get_dvc_output_md5(dvc_file: DvcFile, target_path: str | Path) -> str:
-    """Extract the MD5 hash from a DVC file for a target path.
+        Args:
+            dvc_output (DvcOutput): The DVC output object.
 
-    Args:
-        dvc_file (DvcFile): The DVC file object.
-        target_path (str | Path): The path to the target file or directory.
+        Returns:
+            DvcTrackedFiles: The tracked files object.
+        """
+        md5_hash = dvc_output.md5
+        cache_dir = self._get_cache_dir()
+        cached_file = cache_dir / md5_hash[:2] / md5_hash[2:]
+        cached_file.parent.mkdir(parents=True, exist_ok=True)
+        return DvcTrackedFiles.from_json_file(cached_file)
 
-    Returns:
-        str: The MD5 hash, or an empty string if not found.
-    """
-    target_path = str(target_path)
-    for dvc_output in dvc_file.outputs:
-        if dvc_output.path == target_path:
-            return dvc_output.md5
-    logger.warning("Target path '%s' not found in DVC file dictionary.", target_path)
-    return ""
+    def push(self, remote_name: str) -> None:
+        """Push tracked files to the DVC remote.
 
-
-def load_dvc_file(file_path: str | Path) -> DvcFile:
-    """Load a DVC file from a YAML file.
-
-    Args:
-        file_path (str | Path): Path to the DVC file.
-
-    Returns:
-        DvcFile: The loaded DvcFile object.
-
-    Raises:
-        FileNotFoundError: If the DVC file does not exist.
-    """
-    file_path = Path(file_path)
-    if not file_path.is_file():
-        raise FileNotFoundError(f"DVC file not found: {file_path}")
-
-    return DvcFile.from_yaml_file(file_path)
-
-
-def merge_dvc_files(
-    dvc_files: list[DvcFile],
-) -> DvcFile:
-    """Merge multiple DVC files into one.
-
-    Args:
-        dvc_files (list[DvcFile]): List of DVC file objects.
-
-    Returns:
-        DvcFile: Merged DVC file object.
-    """
-    merged_outputs = []
-    for dvc_file in dvc_files:
-        merged_outputs.extend(dvc_file.outputs)
-    return DvcFile(outputs=merged_outputs)
-
-
-def dvc_track_directory(
-    repo_path: str | Path,
-    directory: str | Path,
-    dvc_tracked_files: DvcTrackedFiles,
-) -> None:
-    """Update the DVC file for a directory with a new MD5 and file list.
-
-    Args:
-        repo_path (str | Path): Path to the DVC repository.
-        directory (str | Path): Directory to update.
-        dvc_tracked_files (DvcTrackedFiles): List of files to track.
-    """
-    repo_path = Path(repo_path)
-    directory = str(directory)
-    # update DVC cache
-    json_content = json.dumps(dvc_tracked_files.to_list(), sort_keys=True, indent=None)
-    md5_hash = hashlib.md5(json_content.encode("utf-8")).hexdigest() + ".dir"
-    cache_file = get_dvc_cache_path(repo_path, md5_hash)
-    if not cache_file.is_file():
-        dvc_tracked_files.to_json_file(cache_file)
-        cache_file.chmod(0o444)
-    # write to DVC file
-    dvc_output = DvcOutput(path=directory, md5=md5_hash, hash_type="md5")
-    dvc_file = DvcFile(outputs=[dvc_output])
-    dvc_file.to_yaml_file((repo_path / directory).with_suffix(".dvc"))
-    logger.info("Updated DVC tracking for directory '%s'", directory)
+        Args:
+            remote_name (str): Name of the remote.
+        """
+        repo = self._get_repo()
+        repo.push(remote=remote_name)
+        logger.info("Pushed tracked files to DVC remote '%s'", remote_name)

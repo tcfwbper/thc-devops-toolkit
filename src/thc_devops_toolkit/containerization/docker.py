@@ -20,6 +20,7 @@ Functions include login, pull, push, build, tag, run, stop, remove, copy, exec, 
 import json
 import logging
 import subprocess
+import time
 from collections import deque
 from typing import Any
 
@@ -165,12 +166,14 @@ def docker_tag(
     logger.info("Successfully tagged Docker image: %s", target_full_image_name)
 
 
-def docker_run_daemon(
+def docker_run_daemon(  # pylint: disable=too-many-arguments
     full_image_name: str,
     remove: bool = False,
     container_name: str | None = None,
     entrypoint: str | None = None,
     command: list[str] | None = None,
+    env_vars: list[str] | None = None,
+    port_mappings: list[str] | None = None,
 ) -> str:
     """Runs a Docker image in daemon mode (detached container).
 
@@ -180,6 +183,8 @@ def docker_run_daemon(
         container_name (str | None, optional): Name for the container. Defaults to None.
         entrypoint (str | None, optional): Entrypoint override. Defaults to None.
         command (list[str] | None, optional): Command to run. Defaults to None.
+        env_vars (list[str] | None, optional): Environment variables (e.g., ["VAR1=value1", "VAR2=value2"]). Defaults to None.
+        port_mappings (list[str] | None, optional): Port mappings (e.g., ["8080:80", "3000:3000"]). Defaults to None.
 
     Returns:
         str: The container ID.
@@ -193,6 +198,12 @@ def docker_run_daemon(
         cmd.append("--rm")
     if container_name:
         cmd.extend(["--name", container_name])
+    if env_vars:
+        for env_var in env_vars:
+            cmd.extend(["-e", env_var])
+    if port_mappings:
+        for port_mapping in port_mappings:
+            cmd.extend(["-p", port_mapping])
     if entrypoint:
         cmd.extend(["--entrypoint", entrypoint])
     cmd.append(full_image_name)
@@ -207,14 +218,16 @@ def docker_run_daemon(
     return container_id
 
 
-def docker_stop(obj: str) -> None:
-    """Stops a running Docker container or object.
+def docker_stop(obj: str, timeout: int = 10, poll_interval: float = 1.0) -> None:
+    """Stops a running Docker container or object and waits until it is stopped.
 
     Args:
         obj (str): The container or object name/ID.
+        timeout (int, optional): Max seconds to wait for stop. Defaults to 30.
+        poll_interval (float, optional): Seconds between status checks. Defaults to 1.0.
 
     Raises:
-        RuntimeError: If stop fails.
+        RuntimeError: If stop fails or container does not stop in time.
     """
     logger.info("Stopping Docker object: %s", obj)
     cmd = ["docker", "stop", obj]
@@ -222,26 +235,75 @@ def docker_stop(obj: str) -> None:
     if process.returncode != 0:
         logger.error("Failed to stop: %s (exit code: %d)", obj, process.returncode)
         raise RuntimeError(f"Failed to stop: {obj} (exit code: {process.returncode})\n{str(process.stderr, 'UTF-8')}")
+    # Wait until container is actually stopped
+    start = time.time()
+    while True:
+        try:
+            info = docker_inspect(obj)
+            state = info.get("State", {})
+            if state.get("Status") == "exited":
+                break
+        except Exception:  # pylint: disable=broad-except
+            # If inspect fails, maybe container is gone
+            break
+        if time.time() - start > timeout:
+            logger.error("Timeout waiting for container %s to stop", obj)
+            raise RuntimeError(f"Timeout waiting for container {obj} to stop")
+        time.sleep(poll_interval)
     logger.info("Successfully stopped Docker object: %s", obj)
 
 
-def docker_remove(container_name: str, ignore_errors: bool = False) -> None:
-    """Removes a Docker container.
+def docker_remove(obj: str, ignore_errors: bool = False, timeout: int = 10, poll_interval: float = 1.0) -> None:
+    """Removes a Docker container and waits until it is removed.
 
     Args:
-        container_name (str): The container name or ID.
+        obj (str): The container name or ID.
         ignore_errors (bool, optional): Ignore errors if True. Defaults to False.
+        timeout (int, optional): Max seconds to wait for removal. Defaults to 30.
+        poll_interval (float, optional): Seconds between status checks. Defaults to 1.0.
 
     Raises:
-        RuntimeError: If remove fails and ignore_errors is False.
+        RuntimeError: If remove fails and ignore_errors is False, or container not removed in time.
     """
-    logger.info("Removing Docker container: %s", container_name)
-    cmd = ["docker", "rm", container_name]
+    logger.info("Removing Docker container: %s", obj)
+    cmd = ["docker", "rm", obj]
     process = subprocess.run(cmd, capture_output=True, check=True)
     if process.returncode != 0 and not ignore_errors:
-        logger.error("Failed to remove: %s (exit code: %d)", container_name, process.returncode)
-        raise RuntimeError(f"Failed to remove: {container_name} (exit code: {process.returncode})\n{str(process.stderr, 'UTF-8')}")
-    logger.info("Successfully removed Docker container: %s", container_name)
+        logger.error("Failed to remove: %s (exit code: %d)", obj, process.returncode)
+        raise RuntimeError(f"Failed to remove: {obj} (exit code: {process.returncode})\n{str(process.stderr, 'UTF-8')}")
+    # Wait until container is actually removed
+    start = time.time()
+    while True:
+        try:
+            docker_inspect(obj)
+        except Exception:  # pylint: disable=broad-except
+            # If inspect fails, container is gone
+            break
+        if time.time() - start > timeout:
+            logger.error("Timeout waiting for container %s to be removed", obj)
+            if not ignore_errors:
+                raise RuntimeError(f"Timeout waiting for container {obj} to be removed")
+            break
+        time.sleep(poll_interval)
+    logger.info("Successfully removed Docker container: %s", obj)
+
+
+def docker_remove_image(full_image_name: str) -> None:
+    """Removes a Docker image.
+
+    Args:
+        full_image_name (str): The full image name.
+
+    Raises:
+        RuntimeError: If remove fails.
+    """
+    logger.info("Removing Docker image: %s", full_image_name)
+    cmd = ["docker", "rmi", full_image_name]
+    process = subprocess.run(cmd, capture_output=True, check=True)
+    if process.returncode != 0:
+        logger.error("Failed to remove image: %s (exit code: %d)", full_image_name, process.returncode)
+        raise RuntimeError(f"Failed to remove image: {full_image_name} (exit code: {process.returncode})\n{str(process.stderr, 'UTF-8')}")
+    logger.info("Successfully removed Docker image: %s", full_image_name)
 
 
 def docker_copy(source: str, target: str) -> None:

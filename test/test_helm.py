@@ -137,3 +137,48 @@ def test_verify_dependencies_missing():
     c1 = DummyChart(name="a", dependencies=["b"])
     with pytest.raises(ValueError):
         helm_mod.verify_dependencies([c1])
+
+def test_chart_from_path_success(tmp_path):
+    chart_dir = tmp_path / "test"
+    chart_dir.mkdir()
+    chart_yaml = chart_dir / "Chart.yaml"
+    values_yaml = chart_dir / "values.yaml"
+    chart_yaml.write_text("""
+version: 1.2.3
+dependencies:
+  - name: dep1
+  - name: dep2
+""")
+    values_yaml.write_text("foo: bar\n")
+    chart = helm_mod.Chart.from_path(tmp_path, "test")
+    assert chart.name == "test"
+    assert chart.version == "1.2.3"
+    assert chart.dependencies == ["dep1", "dep2"]
+    assert chart.path_prefix == tmp_path
+    assert chart.check_list == {}
+
+def test_chart_from_path_missing_chart_yaml(tmp_path):
+    chart_dir = tmp_path / "test"
+    chart_dir.mkdir()
+    values_yaml = chart_dir / "values.yaml"
+    values_yaml.write_text("foo: bar\n")
+    with pytest.raises(FileNotFoundError):
+        helm_mod.Chart.from_path(tmp_path, "test")
+
+def test_chart_from_path_missing_values_yaml(tmp_path):
+    chart_dir = tmp_path / "test"
+    chart_dir.mkdir()
+    chart_yaml = chart_dir / "Chart.yaml"
+    chart_yaml.write_text("version: 1.2.3\n")
+    with pytest.raises(FileNotFoundError):
+        helm_mod.Chart.from_path(tmp_path, "test")
+
+def test_chart_from_path_missing_version(tmp_path):
+    chart_dir = tmp_path / "test"
+    chart_dir.mkdir()
+    chart_yaml = chart_dir / "Chart.yaml"
+    values_yaml = chart_dir / "values.yaml"
+    chart_yaml.write_text("foo: bar\n")
+    values_yaml.write_text("foo: bar\n")
+    with pytest.raises(ValueError):
+        helm_mod.Chart.from_path(tmp_path, "test")

@@ -18,6 +18,7 @@ Functions include login, pull, push, package, verify chart versions/values, and 
 """
 
 import logging
+import os
 import subprocess
 from collections import defaultdict
 from dataclasses import dataclass
@@ -50,6 +51,49 @@ class Chart:
     dependencies: list[str]
     check_list: dict[str, Any]
 
+    @classmethod
+    def from_path(cls, path_prefix: str | Path, name: str) -> "Chart":
+        """Creates a Chart instance by reading Chart.yaml and values.yaml from the specified path.
+
+        Args:
+            path_prefix (str | Path): The path prefix to the chart directory.
+            name (str): The chart name.
+
+        Returns:
+            Chart: The created Chart instance.
+
+        Raises:
+            FileNotFoundError: If Chart.yaml or values.yaml is not found.
+            ValueError: If required fields are missing in Chart.yaml.
+        """
+        chart_root = Path(path_prefix) / name
+        chart_yaml: Path = chart_root / "Chart.yaml"
+        values_yaml: Path = chart_root / "values.yaml"
+        yaml = YAML(typ="safe")
+
+        if not chart_yaml.is_file():
+            raise FileNotFoundError(f"Chart.yaml not found at {chart_yaml}")
+        if not values_yaml.is_file():
+            raise FileNotFoundError(f"values.yaml not found at {values_yaml}")
+
+        # Load Chart.yaml
+        chart_data = yaml.load(chart_yaml)
+        if not chart_data or "version" not in chart_data:
+            raise ValueError(f"Chart version not found in {chart_yaml}")
+        version = chart_data["version"]
+        dependencies = chart_data.get("dependencies", [])
+        if dependencies is None:
+            dependencies = []
+        dependencies = [dependency["name"] for dependency in dependencies if "name" in dependency]
+
+        return cls(
+            name=name,
+            version=version,
+            path_prefix=path_prefix,
+            dependencies=dependencies,
+            check_list={},
+        )
+
 
 def helm_login(cr_host: str, username: str, password: str) -> None:
     """Logs in to a Helm registry.
@@ -64,26 +108,33 @@ def helm_login(cr_host: str, username: str, password: str) -> None:
     """
     logger.info("Logging in to Helm registry: %s", cr_host)
     cmd = ["helm", "registry", "login", cr_host, "-u", username, "--password-stdin"]
-    process = subprocess.run(cmd, input=password.encode("utf-8"), capture_output=True, check=True)
+    env = os.environ.copy()
+    env["HELM_EXPERIMENTAL_OCI"] = "1"
+    process = subprocess.run(cmd, input=password.encode("utf-8"), capture_output=True, check=True, env=env)
     if process.returncode != 0:
         logger.error("Failed to login to Helm registry %s: %s", cr_host, process.stderr.decode("utf-8"))
         raise RuntimeError(f"Failed to login to Helm registry {cr_host} (exit code: {process.returncode})\n{str(process.stderr, 'UTF-8')}")
     logger.info("Successfully logged in to Helm registry: %s", cr_host)
 
 
-def helm_pull(remote_chart: str, version: str) -> None:
+def helm_pull(remote_chart: str, version: str, untar: bool = False) -> None:
     """Pulls a Helm chart from a remote registry.
 
     Args:
         remote_chart (str): The remote chart name.
         version (str): The chart version.
+        untar (bool): Whether to untar the chart after pulling.
 
     Raises:
         RuntimeError: If pull fails.
     """
     logger.info("Pulling Helm chart: %s, version: %s", remote_chart, version)
     cmd = ["helm", "pull", remote_chart, "--version", version]
-    process = subprocess.run(cmd, capture_output=True, check=True)
+    if untar:
+        cmd.append("--untar")
+    env = os.environ.copy()
+    env["HELM_EXPERIMENTAL_OCI"] = "1"
+    process = subprocess.run(cmd, capture_output=True, check=True, env=env)
     if process.returncode != 0:
         logger.error("Failed to pull Helm chart %s: %s", remote_chart, process.stderr.decode("utf-8"))
         raise RuntimeError(
@@ -104,7 +155,9 @@ def helm_package(chart: Chart) -> None:
     chart_path = str(Path(chart.path_prefix) / chart.name)
     logger.info("Packaging Helm chart at path: %s", chart_path)
     cmd = ["helm", "package", chart_path]
-    process = subprocess.run(cmd, capture_output=True, check=True)
+    env = os.environ.copy()
+    env["HELM_EXPERIMENTAL_OCI"] = "1"
+    process = subprocess.run(cmd, capture_output=True, check=True, env=env)
     if process.returncode != 0:
         logger.error("Failed to package Helm chart at %s: %s", chart_path, process.stderr.decode("utf-8"))
         raise RuntimeError(
@@ -126,7 +179,9 @@ def helm_push(chart: Chart, repository: str) -> None:
     tgz_file = chart.name + "-" + chart.version + ".tgz"
     logger.info("Pushing Helm chart %s to repository: %s", tgz_file, repository)
     cmd = ["helm", "push", tgz_file, repository]
-    process = subprocess.run(cmd, capture_output=True, check=True)
+    env = os.environ.copy()
+    env["HELM_EXPERIMENTAL_OCI"] = "1"
+    process = subprocess.run(cmd, capture_output=True, check=True, env=env)
     if process.returncode != 0:
         logger.error("Failed to push Helm chart %s: %s", tgz_file, process.stderr.decode("utf-8"))
         raise RuntimeError(
