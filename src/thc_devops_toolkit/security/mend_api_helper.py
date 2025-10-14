@@ -14,13 +14,11 @@
 # ==============================================================================
 """A collection of utilities for Mend (formerly WhiteSource) API interactions."""
 import json
-import logging
 from typing import Any
 
 import requests
 
-# Set up a default logger for this module
-logger = logging.getLogger(__name__)
+from thc_devops_toolkit.observability import THCLoggerHighlightLevel, thc_logger
 
 
 def get_refresh_token(email: str, user_key: str) -> str:
@@ -68,7 +66,10 @@ def get_alerts_by_library(project_token: str, jwt_token: str) -> dict[str, Any]:
     Returns:
         dict: Alerts grouped by library.
     """
-    logger.info("Start getting alerts by library")
+    thc_logger.highlight(
+        level=THCLoggerHighlightLevel.INFO,
+        message="Start getting alerts by library",
+    )
     url = (
         f"https://api-saas.whitesourcesoftware.com/api/v2.0/projects/{project_token}"
         "/alerts/security/groupBy/component?search=status:equals:ACTIVE"
@@ -82,7 +83,10 @@ def get_alerts_by_library(project_token: str, jwt_token: str) -> dict[str, Any]:
     for key in data:
         if not isinstance(key, str):
             raise ValueError(f"Expected key '{key}' to be a string")
-    logger.info("Successfully finished getting alerts by library")
+    thc_logger.highlight(
+        level=THCLoggerHighlightLevel.INFO,
+        message="Successfully finished getting alerts by library",
+    )
     return data
 
 
@@ -96,7 +100,10 @@ def get_vulnerabilities_by_project(project_token: str, jwt_token: str) -> dict[s
     Returns:
         dict: Vulnerabilities for the project.
     """
-    logger.info("Start getting vulnerabilities by project")
+    thc_logger.highlight(
+        level=THCLoggerHighlightLevel.INFO,
+        message="Start getting vulnerabilities by project",
+    )
     url = f"https://api-saas.whitesourcesoftware.com/api/v2.0/projects/{project_token}/alerts/security?search=status:equals:ACTIVE"
     headers = {"Authorization": f"Bearer {jwt_token}", "Content-Type": "application/json"}
     response = requests.get(url, headers=headers)
@@ -107,5 +114,8 @@ def get_vulnerabilities_by_project(project_token: str, jwt_token: str) -> dict[s
     for key in data:
         if not isinstance(key, str):
             raise ValueError(f"Expected key '{key}' to be a string")
-    logger.info("Successfully finished getting vulnerabilities by project")
+    thc_logger.highlight(
+        level=THCLoggerHighlightLevel.INFO,
+        message="Successfully finished getting vulnerabilities by project",
+    )
     return data

@@ -14,14 +14,12 @@
 # ==============================================================================
 """Utilities for interacting with MinIO object storage."""
 
-import logging
 from io import BytesIO
 from pathlib import Path
 
 from minio import Minio, S3Error
 
-# Set up a default logger for this module
-logger = logging.getLogger(__name__)
+from thc_devops_toolkit.observability import THCLoggerHighlightLevel, thc_logger
 
 
 def get_minio_service(
@@ -60,9 +58,9 @@ def minio_makedir(minio_: Minio, bucket: str, directory: str | Path | None = Non
     """
     if not minio_.bucket_exists(bucket):
         minio_.make_bucket(bucket)
-        logger.debug(
-            "Bucket %s created",
-            bucket,
+        thc_logger.highlight(
+            THCLoggerHighlightLevel.DEBUG,
+            f"Bucket {bucket} created",
         )
     if directory:
         dir_path = str(directory) + "/"
@@ -71,10 +69,9 @@ def minio_makedir(minio_: Minio, bucket: str, directory: str | Path | None = Non
         except S3Error:
             # Directory doesn't exist, create it
             minio_.put_object(bucket, dir_path, BytesIO(b""), 0)
-            logger.debug(
-                "Directory %s in bucket %s created",
-                dir_path,
-                bucket,
+            thc_logger.highlight(
+                THCLoggerHighlightLevel.DEBUG,
+                f"Directory {dir_path} in bucket {bucket} created",
             )
 
 
@@ -95,9 +92,9 @@ def minio_removedir(minio_: Minio, bucket: str, directory: str | Path | None = N
     if directory is None:
         minio_.remove_bucket(bucket)
     target_path = f"{bucket}/{prefix}" if prefix else bucket
-    logger.debug(
-        "Target directory %s removed",
-        target_path,
+    thc_logger.highlight(
+        THCLoggerHighlightLevel.DEBUG,
+        f"Target directory {target_path} removed",
     )
 
 
@@ -131,8 +128,7 @@ def mirror_dir_to_bucket(
                 object_name = str(file_path.relative_to(source))
             minio_.fput_object(bucket, object_name, str(file_path))
     destination = f"{bucket}/{directory}" if directory else str(bucket)
-    logger.debug(
-        "Local directory %s copied to %s",
-        source,
-        destination,
+    thc_logger.highlight(
+        THCLoggerHighlightLevel.DEBUG,
+        f"Local directory {source} copied to {destination}",
     )

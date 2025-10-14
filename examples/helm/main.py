@@ -14,7 +14,6 @@
 # ==============================================================================
 import argparse
 import getpass
-import logging
 import os
 import shutil
 from pathlib import Path
@@ -29,11 +28,6 @@ from thc_devops_toolkit.containerization.helm import (
     verify_chart_version,
     verify_dependencies,
 )
-
-# Set up a default logger for this module
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
 
 example_cr_host = "docker.io"
 remote_chart = "oci://ghcr.io/tcfwbper/helm/devpod"  # public chart

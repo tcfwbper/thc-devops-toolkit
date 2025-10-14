@@ -17,7 +17,6 @@
 Includes MarkdownDocumentManager for managing tables in markdown files, and MarkdownTable for table operations.
 """
 
-import logging
 import re
 import uuid
 from collections.abc import Hashable
@@ -27,13 +26,12 @@ from typing import Any
 
 import pandas as pd
 
+from thc_devops_toolkit.observability import THCLoggerHighlightLevel, thc_logger
+
 _markdown_comment_head: str = "<!--"
 _markdown_comment_tail: str = "-->"
 _markdown_table_marker: str = "MarkdownDocumentManager:Table"
 _markdown_table_id_argument: str = "table_id="
-
-# Set up a default logger for this module
-logger = logging.getLogger(__name__)
 
 
 def get_empty_dataframe(header: list[Hashable]) -> pd.DataFrame:
@@ -45,7 +43,10 @@ def get_empty_dataframe(header: list[Hashable]) -> pd.DataFrame:
     Returns:
         pd.DataFrame: An empty DataFrame with the given columns.
     """
-    logger.debug("Creating empty table with header: %r", header)
+    thc_logger.highlight(
+        THCLoggerHighlightLevel.DEBUG,
+        f"Creating empty table with header: {header}",
+    )
     return pd.DataFrame(columns=header)
 
 
@@ -60,7 +61,10 @@ def match_mask(dataframe: pd.DataFrame, column: Hashable, match_value: Any) -> p
     Returns:
         pd.Series[bool]: Boolean mask for matching rows.
     """
-    logger.debug("Matching mask for column '%s' with value '%r'", column, match_value)
+    thc_logger.highlight(
+        THCLoggerHighlightLevel.DEBUG,
+        f"Matching mask for column '{column}' with value '{match_value}'",
+    )
     condition = pd.Series([True] * len(dataframe))
     condition &= dataframe[column] == match_value
     return condition
@@ -87,7 +91,10 @@ class MarkdownTable:
             primary_key (str): The primary key column.
             insert_ahead (bool, optional): Insert at the top if True. Defaults to False.
         """
-        logger.info("Upserting row with primary_key '%s': %r", primary_key, data)
+        thc_logger.highlight(
+            THCLoggerHighlightLevel.DEBUG,
+            f"Upserting row with primary_key '{primary_key}': {data}",
+        )
         # Ensure dataframe is initialized
         if self.dataframe is None:
             self.dataframe = get_empty_dataframe(list(data.keys()))
@@ -95,16 +102,25 @@ class MarkdownTable:
         condition = match_mask(dataframe=self.dataframe, column=primary_key, match_value=data[primary_key])
         if condition.any():
             # hit
-            logger.debug("Row with primary_key '%s' found, updating row.", data[primary_key])
+            thc_logger.highlight(
+                THCLoggerHighlightLevel.DEBUG,
+                f"Updating existing row with primary_key '{primary_key}': {data}",
+            )
             row_idx = self.dataframe[condition].index[0]
             for key, value in data.items():
                 # skip?
                 if value is not None:
-                    logger.debug("Updating column '%s' to '%r' at row %d", key, value, row_idx)
+                    thc_logger.highlight(
+                        THCLoggerHighlightLevel.DEBUG,
+                        f"Updating column '{key}' to '{value}' at row {row_idx}",
+                    )
                     self.dataframe.at[row_idx, key] = value
         else:
             # new data
-            logger.debug("No row found for primary_key '%s', inserting new row.", data[primary_key])
+            thc_logger.highlight(
+                THCLoggerHighlightLevel.DEBUG,
+                f"No row found for primary_key '{data[primary_key]}', inserting new row.",
+            )
             if insert_ahead:
                 new_df = pd.DataFrame([data])
                 self.dataframe = pd.concat([new_df, self.dataframe], ignore_index=True)
@@ -127,7 +143,10 @@ class MarkdownDocumentManager:
         Args:
             file_path (str | Path): Path to the markdown file.
         """
-        logger.info("Initializing MarkdownDocumentManager for file: %s", file_path)
+        thc_logger.highlight(
+            THCLoggerHighlightLevel.INFO,
+            f"Initializing MarkdownDocumentManager for file: {file_path}",
+        )
         self.file_path: Path = Path(file_path)
         self.lines: list[str | MarkdownTable] = []
         self.tables: dict[str, MarkdownTable] = {}
@@ -135,17 +154,26 @@ class MarkdownDocumentManager:
 
     def _load_document(self) -> None:
         """Loads the markdown document from file and parses tables."""
-        logger.info("Loading document from: %s", self.file_path)
+        thc_logger.highlight(
+            THCLoggerHighlightLevel.INFO,
+            f"Loading markdown document from: {self.file_path}",
+        )
         if self.file_path.exists():
             with self.file_path.open("r", encoding="utf-8") as file:
                 self.lines = [line.rstrip() for line in file.readlines()]
         else:
-            logger.warning("File does not exist: %s", self.file_path)
+            thc_logger.highlight(
+                THCLoggerHighlightLevel.WARNING,
+                f"File does not exist: {self.file_path}",
+            )
         self._parse_lines()
 
     def _parse_lines(self) -> None:
         """Parses document lines and identifies tables and markers."""
-        logger.debug("Parsing lines in markdown document.")
+        thc_logger.highlight(
+            THCLoggerHighlightLevel.INFO,
+            "Parsing lines in markdown document.",
+        )
         # housekeeping
         self.tables.clear()
 
@@ -176,14 +204,20 @@ class MarkdownDocumentManager:
             # is table?
             # This match table like "| something | else |"
             if re.match(r"^\s*\|.*\|\s*$", line):
-                logger.debug("Found markdown table at line %d", i)
+                thc_logger.highlight(
+                    THCLoggerHighlightLevel.DEBUG,
+                    f"Found markdown table at line {i}",
+                )
                 markdown_table = self._parse_table(i)
                 if markdown_table:
                     # if table_id is not defined, we don't care about this table
                     # just assign a temporary and random one
                     if not table_id:
                         table_id = self._get_tmp_table_id()
-                        logger.warning("Table without marker found, assigning temporary table_id: %s", table_id)
+                        thc_logger.highlight(
+                            THCLoggerHighlightLevel.WARNING,
+                            f"Table without marker found, assigning temporary table_id: {table_id}",
+                        )
                     markdown_table.table_id = table_id
                     self.tables[table_id] = markdown_table
                     table_id = None
@@ -202,9 +236,15 @@ class MarkdownDocumentManager:
         Returns:
             MarkdownTable | None: Parsed table or None if not found.
         """
-        logger.debug("Parsing table starting at line %d", start_line)
+        thc_logger.highlight(
+            THCLoggerHighlightLevel.DEBUG,
+            f"Parsing table starting at line {start_line}",
+        )
         if start_line >= len(self.lines):
-            logger.warning("Start line %d out of range for table parsing.", start_line)
+            thc_logger.highlight(
+                THCLoggerHighlightLevel.WARNING,
+                f"Start line {start_line} out of range for table parsing.",
+            )
             return None
 
         table_lines: list[str] = []
@@ -220,7 +260,10 @@ class MarkdownDocumentManager:
 
         # at least 2 lines for a table (header + separator)
         if len(table_lines) < 2:
-            logger.warning("Table at line %d has less than 2 lines, skipping.", start_line)
+            thc_logger.highlight(
+                THCLoggerHighlightLevel.WARNING,
+                f"Table at line {start_line} has less than 2 lines, skipping.",
+            )
             return None
 
         header = [col.strip() for col in table_lines[0].split("|")[1:-1]]
@@ -232,7 +275,10 @@ class MarkdownDocumentManager:
                 data_item = {header[j]: cols[j] for j in range(len(header))}
                 data.append(data_item)
             else:
-                logger.warning("Row has wrong number of columns at line %d", start_line)
+                thc_logger.highlight(
+                    THCLoggerHighlightLevel.WARNING,
+                    f"Row in table at line {start_line} has mismatched columns, skipping row: {row}",
+                )
 
         dataframe = pd.DataFrame(data, columns=header)
 
@@ -241,7 +287,10 @@ class MarkdownDocumentManager:
         # replace lines with table object
         del self.lines[start_line:i]
         self.lines.insert(start_line, markdown_table)
-        logger.debug("Inserted MarkdownTable object at line %d", start_line)
+        thc_logger.highlight(
+            THCLoggerHighlightLevel.DEBUG,
+            f"Inserted MarkdownTable object at line {start_line}.",
+        )
         return markdown_table
 
     @staticmethod
@@ -252,7 +301,10 @@ class MarkdownDocumentManager:
             str: Temporary table id.
         """
         tmp_id = "default-" + str(uuid.uuid4())
-        logger.debug("Generated temporary table_id: %s", tmp_id)
+        thc_logger.highlight(
+            THCLoggerHighlightLevel.DEBUG,
+            f"Generated temporary table_id: {tmp_id}",
+        )
         return tmp_id
 
     def insert_table(self, table: MarkdownTable, line_idx: int) -> None:
@@ -265,16 +317,25 @@ class MarkdownDocumentManager:
         Raises:
             ValueError: If table id already exists.
         """
-        logger.info("Inserting table with id '%s' at line %d", table.table_id, line_idx)
+        thc_logger.highlight(
+            THCLoggerHighlightLevel.INFO,
+            f"Inserting table with id '{table.table_id}' at line {line_idx}",
+        )
         if table.table_id:
             table_marker = self.generate_table_marker(table.table_id)
         else:
-            logger.warning("Table ID is not defined. Generating a temporary ID.")
+            thc_logger.highlight(
+                THCLoggerHighlightLevel.WARNING,
+                "Table ID is not defined. Generating a temporary ID.",
+            )
             table.table_id = self._get_tmp_table_id()
             table_marker = None
 
         if table.table_id in self.tables:
-            logger.error("Table with id %s already exists, cannot insert.", table.table_id)
+            thc_logger.highlight(
+                THCLoggerHighlightLevel.ERROR,
+                f"Table with id '{table.table_id}' already exists. Insertion aborted.",
+            )
             raise ValueError(f"Table with id {table.table_id} already exists")
 
         if table_marker:
@@ -282,7 +343,10 @@ class MarkdownDocumentManager:
             line_idx += 1
         self.lines.insert(line_idx, table)
         self.tables[table.table_id] = table
-        logger.debug("Table with id '%s' inserted.", table.table_id)
+        thc_logger.highlight(
+            THCLoggerHighlightLevel.DEBUG,
+            f"Inserted table with id '{table.table_id}' at line {line_idx}.",
+        )
 
     def list_tables(self) -> list[str]:
         """Lists all table ids in the document.
@@ -290,12 +354,18 @@ class MarkdownDocumentManager:
         Returns:
             list[str]: List of table ids.
         """
-        logger.info("Listing all table ids in document.")
+        thc_logger.highlight(
+            THCLoggerHighlightLevel.INFO,
+            "Listing all table ids in document.",
+        )
         return list(self.tables.keys())
 
     def save_document(self) -> None:
         """Saves the current document (including tables) to file."""
-        logger.info("Saving document to: %s", self.file_path)
+        thc_logger.highlight(
+            THCLoggerHighlightLevel.INFO,
+            f"Saving document to: {self.file_path}",
+        )
         # Create a new list to hold the final content
         final_lines: list[str] = []
         i = 0
@@ -306,7 +376,10 @@ class MarkdownDocumentManager:
             if isinstance(line_obj, MarkdownTable):
                 markdown_table = line_obj
                 if markdown_table.dataframe is not None:
-                    logger.debug("Writing table with id '%s' to file.", markdown_table.table_id)
+                    thc_logger.highlight(
+                        THCLoggerHighlightLevel.DEBUG,
+                        f"Writing table with id '{markdown_table.table_id}' to file.",
+                    )
                     table_lines = markdown_table.dataframe.to_markdown(index=False).split("\n")
                     # Remove empty lines at the end
                     while table_lines and not table_lines[-1].strip():
@@ -320,7 +393,10 @@ class MarkdownDocumentManager:
         with self.file_path.open("w", encoding="utf-8") as file:
             for line in final_lines:
                 file.write(line + "\n")
-        logger.info("Document saved successfully to: %s", self.file_path)
+        thc_logger.highlight(
+            THCLoggerHighlightLevel.INFO,
+            f"Document saved successfully to: {self.file_path}",
+        )
 
     @staticmethod
     def generate_table_marker(table_id: str) -> str:
@@ -332,5 +408,8 @@ class MarkdownDocumentManager:
         Returns:
             str: The table marker comment.
         """
-        logger.debug("Generating table marker for table_id: %s", table_id)
+        thc_logger.highlight(
+            THCLoggerHighlightLevel.DEBUG,
+            f"Generating table marker for table_id: {table_id}",
+        )
         return f"{_markdown_comment_head}{_markdown_table_marker} {_markdown_table_id_argument}{table_id}{_markdown_comment_tail}"
