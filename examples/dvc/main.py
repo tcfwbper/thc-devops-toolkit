@@ -12,17 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-import logging
 import shutil
 from pathlib import Path
 
 from thc_devops_toolkit.version_control.dvc import DvcRepo
 from thc_devops_toolkit.version_control.git import GitCredential, GitRepo
-
-# Set up a default logger for this module
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
 
 dvc_example_dir = Path(__file__).resolve().parent
 remote_name = "my_remote"

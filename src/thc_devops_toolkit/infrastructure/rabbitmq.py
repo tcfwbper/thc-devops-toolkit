@@ -13,7 +13,6 @@
 # limitations under the License.
 # ==============================================================================
 """RabbitMQ manager for sending and receiving messages using RabbitMQ."""
-import logging
 import time
 from dataclasses import dataclass
 from enum import Enum
@@ -23,8 +22,7 @@ from typing import Any
 
 import pika
 
-# Set up a default logger for this module
-logger = logging.getLogger(__name__)
+from thc_devops_toolkit.observability import THCLoggerHighlightLevel, thc_logger
 
 
 class RabbitMQActions(Enum):
@@ -122,7 +120,10 @@ class RabbitMQManager:  # pylint: disable=too-many-instance-attributes
     def run(self) -> None:
         """Starts all registered sender and receiver threads."""
         for receiver in self.receivers.values():
-            logger.info("[RabbitMQ] start receiver: %s", receiver)
+            thc_logger.highlight(
+                level=THCLoggerHighlightLevel.INFO,
+                message=f"[RabbitMQ] start receiver: {receiver}",
+            )
             thread = Thread(
                 target=self.recv,
                 args=(
@@ -135,7 +136,10 @@ class RabbitMQManager:  # pylint: disable=too-many-instance-attributes
             thread.start()
             self.threads.append(thread)
         for sender in self.senders.values():
-            logger.info("[RabbitMQ] start sender: %s", sender)
+            thc_logger.highlight(
+                level=THCLoggerHighlightLevel.INFO,
+                message=f"[RabbitMQ] start sender: {sender}",
+            )
             thread = Thread(
                 target=self.send,
                 args=(
@@ -171,15 +175,24 @@ class RabbitMQManager:  # pylint: disable=too-many-instance-attributes
                 properties (Any): Properties.
                 body (bytes): Message body.
             """
-            logger.info("[RabbitMQ] data receive from %s/%s", exchange_name, routing_key)
+            thc_logger.highlight(
+                level=THCLoggerHighlightLevel.INFO,
+                message=f"[RabbitMQ] data receive from {exchange_name}/{routing_key}",
+            )
             try:
                 chan.put(body)
             except Exception as exception:  # pylint: disable=broad-except
-                logger.error(exception)
+                thc_logger.highlight(
+                    level=THCLoggerHighlightLevel.ERROR,
+                    message=f"[RabbitMQ] Failed to put data into queue {chan}: {exception}",
+                )
 
         while not self.shutdown_event.is_set():
             try:
-                logger.info("[RabbitMQ] %s/%s starting...", exchange_name, routing_key)
+                thc_logger.highlight(
+                    level=THCLoggerHighlightLevel.INFO,
+                    message=f"[RabbitMQ] {exchange_name}/{routing_key} starting...",
+                )
                 connection = pika.BlockingConnection(
                     pika.ConnectionParameters(host=self.host, port=self.port, credentials=self.credentials),
                 )
@@ -193,8 +206,14 @@ class RabbitMQManager:  # pylint: disable=too-many-instance-attributes
             except Exception as exception:  # pylint: disable=broad-except
                 if self.shutdown_event.is_set():
                     break
-                logger.info("[RabbitMQ] %s/%s restart...", exchange_name, routing_key)
-                logger.error(exception)
+                thc_logger.highlight(
+                    level=THCLoggerHighlightLevel.INFO,
+                    message=f"[RabbitMQ] {exchange_name}/{routing_key} restart...",
+                )
+                thc_logger.highlight(
+                    level=THCLoggerHighlightLevel.ERROR,
+                    message=f"[RabbitMQ] Error occurred: {exception}",
+                )
                 time.sleep(10)
 
     def send(self, chan: Queue[bytes], exchange_name: str, routing_key: str) -> None:
@@ -215,14 +234,20 @@ class RabbitMQManager:  # pylint: disable=too-many-instance-attributes
                 channel = connection.channel()
                 channel.exchange_declare(exchange=exchange_name, exchange_type=self.exchange_type)
                 channel.basic_publish(exchange=exchange_name, routing_key=routing_key, body=data)
-                logger.info("[RabbitMQ] data send to %s/%s", exchange_name, routing_key)
+                thc_logger.highlight(
+                    level=THCLoggerHighlightLevel.INFO,
+                    message=f"[RabbitMQ] data send to {exchange_name}/{routing_key}",
+                )
                 connection.close()
             except Empty:
                 continue
             except Exception as exception:  # pylint: disable=broad-except
                 if self.shutdown_event.is_set():
                     break
-                logger.error(exception)
+                thc_logger.highlight(
+                    level=THCLoggerHighlightLevel.ERROR,
+                    message=f"[RabbitMQ] Error occurred: {exception}",
+                )
                 # Brief pause before retry
                 time.sleep(10)
                 if "data" in locals():
@@ -230,16 +255,22 @@ class RabbitMQManager:  # pylint: disable=too-many-instance-attributes
 
     def shutdown(self) -> None:
         """Gracefully shuts down the RabbitMQ manager and all threads."""
-        logger.info("[RabbitMQ] Initiating graceful shutdown...")
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.INFO,
+            message="[RabbitMQ] Initiating graceful shutdown...",
+        )
         self.shutdown_event.set()
 
         # Wait for all threads to finish with a reasonable timeout
         for thread in self.threads:
             thread.join(timeout=5.0)
             if thread.is_alive():
-                logger.warning(
-                    "[RabbitMQ] Thread %s did not stop within timeout",
-                    thread.name,
+                thc_logger.highlight(
+                    level=THCLoggerHighlightLevel.WARNING,
+                    message=f"[RabbitMQ] Thread {thread.name} did not stop within timeout",
                 )
 
-        logger.info("[RabbitMQ] Graceful shutdown completed")
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.INFO,
+            message="[RabbitMQ] Graceful shutdown completed",
+        )

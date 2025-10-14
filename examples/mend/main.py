@@ -14,8 +14,8 @@
 # ==============================================================================
 
 import argparse
-import logging
 
+from thc_devops_toolkit.observability import THCLoggerHighlightLevel, thc_logger
 from thc_devops_toolkit.security.mend_api_helper import (
     get_alerts_by_library,
     get_jwt_token,
@@ -23,24 +23,26 @@ from thc_devops_toolkit.security.mend_api_helper import (
     get_vulnerabilities_by_project,
 )
 
-# Set up a default logger for this module
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Mend API Helper")
     parser.add_argument("--email", required=True, help="Your Mend account email")
-    parser.add_argument("--user_key", required=True, help="Your Mend user key")
-    parser.add_argument("--project_token", required=True, help="Your Mend project token")
+    parser.add_argument("--user-key", required=True, help="Your Mend user key")
+    parser.add_argument("--project-token", required=True, help="Your Mend project token")
     args = parser.parse_args()
 
     refresh_token = get_refresh_token(args.email, args.user_key)
     jwt_token = get_jwt_token(refresh_token)
     alerts = get_alerts_by_library(args.project_token, jwt_token)
-    logger.info("Alerts: %s", alerts)
+    thc_logger.highlight(
+        level=THCLoggerHighlightLevel.INFO,
+        message=f"Alerts: {alerts}",
+    )
     vulnerabilities = get_vulnerabilities_by_project(args.project_token, jwt_token)
-    logger.info("Vulnerabilities: %s", vulnerabilities)
+    thc_logger.highlight(
+        level=THCLoggerHighlightLevel.INFO,
+        message=f"Vulnerabilities: {vulnerabilities}",
+    )
 
 
 if __name__ == "__main__":

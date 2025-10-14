@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-import logging
 import time
 from contextlib import contextmanager
 from pathlib import Path
@@ -20,11 +19,7 @@ from typing import Iterator
 
 from thc_devops_toolkit.containerization.docker import docker_pull, docker_run_daemon, docker_stop
 from thc_devops_toolkit.infrastructure.minio import get_minio_service, minio_makedir, minio_removedir, mirror_dir_to_bucket
-
-# Set up a default logger for this module
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
+from thc_devops_toolkit.observability import THCLoggerHighlightLevel, thc_logger
 
 minio_example_dir = Path(__file__).resolve().parent
 minio_full_image_name = "minio/minio:RELEASE.2025-09-07T16-13-09Z-cpuv1"
@@ -60,7 +55,7 @@ def run_minio_server(
 
 def main() -> None:
     with run_minio_server(access_key=access_key, secret_key=secret_key):
-        logger.info("MinIO server is running.")
+        thc_logger.highlight(THCLoggerHighlightLevel.INFO, "MinIO server is running.")
         minio_ = get_minio_service(
             s3_server=minio_server,
             s3_access_key=access_key,
@@ -92,7 +87,7 @@ def main() -> None:
             minio_=minio_,
             bucket="testbk",
         )
-    logger.info("MinIO server is stopped.")
+    thc_logger.highlight(THCLoggerHighlightLevel.INFO, "MinIO server is stopped.")
 
 
 if __name__ == "__main__":

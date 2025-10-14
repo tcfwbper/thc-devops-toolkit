@@ -12,17 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-import logging
 from pathlib import Path
 
 import pandas as pd
 
 from thc_devops_toolkit.documentation.markdown import MarkdownDocumentManager, MarkdownTable
-
-# Set up a default logger for this module
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
+from thc_devops_toolkit.observability import THCLoggerHighlightLevel, thc_logger
 
 md_example_dir = Path(__file__).resolve().parent
 md_file = md_example_dir / "my_file.md"
@@ -34,7 +29,10 @@ def main() -> None:
 
     # Read empty document
     doc_manager = MarkdownDocumentManager(md_file)
-    logger.info(f"Loaded document with {len(doc_manager.lines)} lines")
+    thc_logger.highlight(
+        level=THCLoggerHighlightLevel.INFO,
+        message=f"Loaded document with {len(doc_manager.lines)} lines",
+    )
 
     # Create MarkdownTable
     sample_data = [
@@ -43,7 +41,10 @@ def main() -> None:
     ]
     dataframe = pd.DataFrame(sample_data)
     table = MarkdownTable(table_id="my_projects", dataframe=dataframe)
-    logger.info(f"Created table with {len(dataframe)} rows and columns: {list(dataframe.columns)}")
+    thc_logger.highlight(
+        level=THCLoggerHighlightLevel.INFO,
+        message=f"Created table with {len(dataframe)} rows and columns: {list(dataframe.columns)}",
+    )
 
     # Update markdown file
     doc_manager.lines.append("# My Projects")
@@ -53,14 +54,20 @@ def main() -> None:
     doc_manager.lines.append("## Notes")
     doc_manager.lines.append("- There are some useful projects.")
     doc_manager.lines.append("- Welcome to pull and contribute.")
-    logger.info(f"Document now has {len(doc_manager.lines)} lines")
+    thc_logger.highlight(
+        level=THCLoggerHighlightLevel.INFO,
+        message=f"Document now has {len(doc_manager.lines)} lines",
+    )
 
     # Update an existing project or insert a new project
     table.upsert_row(data={"Project": "DEVPOD", "Owner": "Tsung-Han Chang"}, primary_key="Project")
 
     # Save the document
     doc_manager.save_document()
-    logger.info(f"Document saved to {md_file}")
+    thc_logger.highlight(
+        level=THCLoggerHighlightLevel.INFO,
+        message=f"Document saved to {md_file}",
+    )
 
 
 if __name__ == "__main__":

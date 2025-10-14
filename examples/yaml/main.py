@@ -12,14 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-import logging
 from pathlib import Path
 
 from ruamel.yaml import YAML
 
 from thc_devops_toolkit.utils.yaml import get_value_from_dict, set_value_to_dict
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 yaml_example_dir = Path(__file__).resolve().parent
 yaml_file: str = str(yaml_example_dir / "example.yaml")

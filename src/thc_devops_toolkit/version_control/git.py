@@ -17,13 +17,11 @@
 Functions include cloning, configuring, committing, pushing, pulling, and managing remotes.
 """
 
-import logging
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-# Set up a default logger for this module
-logger = logging.getLogger(__name__)
+from thc_devops_toolkit.observability import THCLoggerHighlightLevel, thc_logger
 
 
 @dataclass
@@ -103,29 +101,44 @@ class GitRepo:
         Raises:
             RuntimeError: If setting the config fails.
         """
-        logger.info("Setting local git config user.email to %s", self.email)
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.INFO,
+            message=f"Setting local git config user.email to {self.email}",
+        )
 
         cmd = ["git", "config", "--local", "user.email", self.email]
         process = subprocess.run(cmd, cwd=self.local_path, capture_output=True, check=True)
 
         if process.returncode != 0:
-            logger.error("Failed to set git config email: %s (exit code: %d)", self.email, process.returncode)
+            thc_logger.highlight(
+                level=THCLoggerHighlightLevel.ERROR,
+                message=f"Failed to set git config email: {self.email} (exit code: {process.returncode})",
+            )
             raise RuntimeError(
                 f"Failed to set git config email: {self.email} (exit code: {process.returncode})\n{process.stderr.decode('utf-8')}"
             )
 
-        logger.info("Setting local git config user.name to %s", self.credential.user)
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.INFO,
+            message=f"Setting local git config user.name to {self.credential.user}",
+        )
         cmd = ["git", "config", "--local", "user.name", self.credential.user]
 
         process = subprocess.run(cmd, cwd=self.local_path, capture_output=True, check=True)
         if process.returncode != 0:
-            logger.error("Failed to set git config username: %s (exit code: %d)", self.credential.user, process.returncode)
+            thc_logger.highlight(
+                level=THCLoggerHighlightLevel.ERROR,
+                message=f"Failed to set git config username: {self.credential.user} (exit code: {process.returncode})",
+            )
             raise RuntimeError(
                 f"Failed to set git config username: {self.credential.user} "
                 f"(exit code: {process.returncode})\n{process.stderr.decode('utf-8')}"
             )
 
-        logger.info("Successfully set local git config for user: %s, email: %s", self.credential.user, self.email)
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.INFO,
+            message=f"Successfully set local git config for user: {self.credential.user}, email: {self.email}",
+        )
 
     def _get_remotes(self) -> None:
         """Retrieves the Git remotes and their URLs.
@@ -133,7 +146,10 @@ class GitRepo:
         Raises:
             RuntimeError: If getting the remotes fails.
         """
-        logger.info("Getting git remotes")
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.INFO,
+            message="Getting git remotes",
+        )
         cmd = ["git", "remote", "-v"]
         process = subprocess.run(
             cmd,
@@ -144,7 +160,10 @@ class GitRepo:
         )
 
         if process.returncode != 0:
-            logger.error("Failed to get git remotes (exit code: %d)", process.returncode)
+            thc_logger.highlight(
+                level=THCLoggerHighlightLevel.ERROR,
+                message=f"Failed to get git remotes (exit code: {process.returncode})",
+            )
             raise RuntimeError(f"Failed to get git remotes (exit code: {process.returncode})\n{process.stderr}")
 
         for remote_info in process.stdout.strip().splitlines():
@@ -153,7 +172,10 @@ class GitRepo:
                 name, url = parts[0], parts[1]
                 self.remotes[name] = url
 
-        logger.info("Successfully got git remotes")
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.INFO,
+            message=f"Successfully retrieved git remotes: {self.remotes}",
+        )
 
     def init(self) -> None:
         """Initializes a new Git repository at the local path.
@@ -161,7 +183,10 @@ class GitRepo:
         Raises:
             RuntimeError: If git init fails.
         """
-        logger.info("Initializing new git repo at %s", self.local_path)
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.INFO,
+            message=f"Initializing new git repo at {self.local_path}",
+        )
 
         repo_path = Path(self.local_path)
         if not repo_path.is_dir():
@@ -171,11 +196,17 @@ class GitRepo:
         process = subprocess.run(cmd, cwd=self.local_path, capture_output=True, check=True)
 
         if process.returncode != 0:
-            logger.error("Failed to initialize git repo (exit code: %d)", process.returncode)
+            thc_logger.highlight(
+                level=THCLoggerHighlightLevel.ERROR,
+                message=f"Failed to initialize git repo (exit code: {process.returncode})",
+            )
             raise RuntimeError(f"Failed to initialize git repo (exit code: {process.returncode})")
 
         self._set_config()
-        logger.info("Successfully initialized git repo at %s", self.local_path)
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.INFO,
+            message=f"Successfully initialized git repo at {self.local_path}",
+        )
 
     def clone(self, branch: str = "main") -> None:
         """Clones a Git repository using the provided PAT format URL and branch.
@@ -191,21 +222,33 @@ class GitRepo:
             masked_pat_format_url = self._get_pat_format_url(mask_token=True)
             pat_format_url = self._get_pat_format_url(mask_token=False)
         except ValueError as exception:
-            logger.error("Error in repository URL: %s", exception)
+            thc_logger.highlight(
+                level=THCLoggerHighlightLevel.ERROR,
+                message=f"Error in repository URL: {exception}",
+            )
             raise
 
-        logger.info("Cloning repo from %s on branch %s to %s", masked_pat_format_url, branch, self.local_path)
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.INFO,
+            message=f"Cloning repo from {masked_pat_format_url} on branch {branch} to {self.local_path}",
+        )
 
         cmd = ["git", "clone", "-b", branch, pat_format_url, self.local_path]
         process = subprocess.run(cmd, capture_output=True, check=True)
 
         if process.returncode != 0:
-            logger.error("Failed to clone repo (exit code: %d)", process.returncode)
+            thc_logger.highlight(
+                level=THCLoggerHighlightLevel.ERROR,
+                message=f"Failed to clone repo (exit code: {process.returncode})",
+            )
             raise RuntimeError(f"Failed to clone repo (exit code: {process.returncode})")
 
         self._set_config()
         self._get_remotes()
-        logger.info("Successfully cloned repo from %s", masked_pat_format_url)
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.INFO,
+            message=f"Successfully cloned repo from {masked_pat_format_url}",
+        )
 
     def get_remote_url(self, mask_token: bool, remote_name: str = "origin") -> str:
         """Gets the URL of a Git remote.
@@ -234,17 +277,26 @@ class GitRepo:
         Raises:
             RuntimeError: If setting the remote URL fails.
         """
-        logger.info("Setting git remote url for %s to %s", remote_name, new_url)
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.INFO,
+            message=f"Setting git remote url for {remote_name} to {new_url}",
+        )
 
         cmd = ["git", "remote", "set-url", remote_name, new_url]
         process = subprocess.run(cmd, cwd=self.local_path, capture_output=True, check=True)
 
         if process.returncode != 0:
-            logger.error("Failed to set remote url (exit code: %d)", process.returncode)
+            thc_logger.highlight(
+                level=THCLoggerHighlightLevel.ERROR,
+                message=f"Failed to set remote url (exit code: {process.returncode})",
+            )
             raise RuntimeError(f"Failed to set remote url (exit code: {process.returncode})\n{process.stderr.decode('utf-8')}")
 
         self.remotes[remote_name] = new_url
-        logger.info("Successfully set remote url for %s to %s", remote_name, new_url)
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.INFO,
+            message=f"Successfully set remote url for {remote_name} to {new_url}",
+        )
 
     def checkout(self, ref: str, new_branch: bool) -> None:
         """Checks out a specific commit or branch.
@@ -256,7 +308,10 @@ class GitRepo:
         Raises:
             RuntimeError: If checkout fails.
         """
-        logger.info("Checking out ref: %s", ref)
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.INFO,
+            message=f"Checking out ref: {ref} (new_branch={new_branch})",
+        )
 
         cmd = ["git", "checkout"]
         if new_branch:
@@ -265,10 +320,16 @@ class GitRepo:
         process = subprocess.run(cmd, cwd=self.local_path, capture_output=True, check=True)
 
         if process.returncode != 0:
-            logger.error("Failed to checkout to %s (exit code: %d)", ref, process.returncode)
+            thc_logger.highlight(
+                level=THCLoggerHighlightLevel.ERROR,
+                message=f"Failed to checkout to {ref} (exit code: {process.returncode})",
+            )
             raise RuntimeError(f"Failed to checkout to {ref} (exit code: {process.returncode})\n{process.stderr.decode('utf-8')}")
 
-        logger.info("Successfully checked out ref: %s", ref)
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.INFO,
+            message=f"Successfully checked out ref: {ref}",
+        )
 
     def add_all(self) -> None:
         """Adds all changes to the Git staging area.
@@ -276,16 +337,25 @@ class GitRepo:
         Raises:
             RuntimeError: If adding changes fails.
         """
-        logger.info("Adding all changes to git staging area")
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.INFO,
+            message="Adding all changes to git staging area",
+        )
 
         cmd = ["git", "add", "."]
         process = subprocess.run(cmd, cwd=self.local_path, capture_output=True, check=True)
 
         if process.returncode != 0:
-            logger.error("Failed to add changes (exit code: %d)", process.returncode)
+            thc_logger.highlight(
+                level=THCLoggerHighlightLevel.ERROR,
+                message=f"Failed to add changes (exit code: {process.returncode})",
+            )
             raise RuntimeError(f"Failed to add changes (exit code: {process.returncode})\n{process.stderr.decode('utf-8')}")
 
-        logger.info("Successfully added all changes to staging area")
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.INFO,
+            message="Successfully added all changes to staging area",
+        )
 
     def commit(self, message: str = "default commit message") -> None:
         """Commits staged changes with a commit message.
@@ -296,16 +366,25 @@ class GitRepo:
         Raises:
             RuntimeError: If commit fails.
         """
-        logger.info("Committing with message: %s", message)
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.INFO,
+            message=f"Committing with message: {message}",
+        )
 
         cmd = ["git", "commit", "-m", message]
         process = subprocess.run(cmd, cwd=self.local_path, capture_output=True, check=True)
 
         if process.returncode != 0:
-            logger.error("Failed to commit staged changes (exit code: %d)", process.returncode)
+            thc_logger.highlight(
+                level=THCLoggerHighlightLevel.ERROR,
+                message=f"Failed to commit staged changes (exit code: {process.returncode})",
+            )
             raise RuntimeError(f"Failed to commit staged changes (exit code: {process.returncode})\n{process.stderr.decode('utf-8')}")
 
-        logger.info("Successfully committed changes")
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.INFO,
+            message="Successfully committed changes",
+        )
 
     def pull(self, rebase: bool, branch: str, remote_name: str = "origin") -> None:
         """Pulls changes from a remote branch, optionally using rebase.
@@ -318,7 +397,10 @@ class GitRepo:
         Raises:
             RuntimeError: If pull fails.
         """
-        logger.info("Pulling from remote %s branch %s (rebase=%r)", remote_name, branch, rebase)
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.INFO,
+            message=f"Pulling from remote {remote_name} branch {branch} (rebase={rebase})",
+        )
 
         cmd = ["git", "pull"]
         if rebase:
@@ -328,10 +410,16 @@ class GitRepo:
         process = subprocess.run(cmd, cwd=self.local_path, capture_output=True, check=True)
 
         if process.returncode != 0:
-            logger.error("Failed to pull from remote (exit code: %d)", process.returncode)
+            thc_logger.highlight(
+                level=THCLoggerHighlightLevel.ERROR,
+                message=f"Failed to pull from remote (exit code: {process.returncode})",
+            )
             raise RuntimeError(f"Failed to pull from remote (exit code: {process.returncode})\n{process.stderr.decode('utf-8')}")
 
-        logger.info("Successfully pulled from remote %s branch %s", remote_name, branch)
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.INFO,
+            message=f"Successfully pulled from remote {remote_name} branch {branch}",
+        )
 
     def push(self, branch: str, remote_name: str = "origin") -> None:
         """Pushes the current branch to the specified remote.
@@ -343,7 +431,10 @@ class GitRepo:
         Raises:
             RuntimeError: If push fails.
         """
-        logger.info("Pushing to remote %s branch %s", remote_name, branch)
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.INFO,
+            message=f"Pushing to remote {remote_name} branch {branch}",
+        )
 
         cmd = ["git", "push"]
         cmd.append(remote_name)
@@ -351,7 +442,13 @@ class GitRepo:
         process = subprocess.run(cmd, cwd=self.local_path, capture_output=True, check=True)
 
         if process.returncode != 0:
-            logger.error("Failed to push to remote (exit code: %d)", process.returncode)
+            thc_logger.highlight(
+                level=THCLoggerHighlightLevel.ERROR,
+                message=f"Failed to push to remote (exit code: {process.returncode})",
+            )
             raise RuntimeError(f"Failed to push to remote (exit code: {process.returncode})\n{process.stderr.decode('utf-8')}")
 
-        logger.info("Successfully pushed to remote %s branch %s", remote_name, branch)
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.INFO,
+            message=f"Successfully pushed to remote {remote_name} branch {branch}",
+        )

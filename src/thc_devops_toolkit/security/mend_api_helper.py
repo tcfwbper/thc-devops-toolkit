@@ -14,13 +14,11 @@
 # ==============================================================================
 """A collection of utilities for Mend (formerly WhiteSource) API interactions."""
 import json
-import logging
 from typing import Any
 
 import requests
 
-# Set up a default logger for this module
-logger = logging.getLogger(__name__)
+from thc_devops_toolkit.observability import THCLoggerHighlightLevel, thc_logger
 
 
 def get_refresh_token(email: str, user_key: str) -> str:
@@ -58,7 +56,7 @@ def get_jwt_token(refresh_token: str) -> str:
     return str(data["response"]["jwtToken"])
 
 
-def get_alerts_by_library(project_token: str, jwt_token: str) -> dict[str, Any]:
+def get_alerts_by_library(project_token: str, jwt_token: str) -> list[dict[str, Any]]:
     """Retrieves security alerts grouped by library for a given project.
 
     Args:
@@ -66,9 +64,12 @@ def get_alerts_by_library(project_token: str, jwt_token: str) -> dict[str, Any]:
         jwt_token (str): JWT token for authentication.
 
     Returns:
-        dict: Alerts grouped by library.
+        list[dict[str, Any]]: Alerts grouped by library.
     """
-    logger.info("Start getting alerts by library")
+    thc_logger.highlight(
+        level=THCLoggerHighlightLevel.INFO,
+        message="Start getting alerts by library",
+    )
     url = (
         f"https://api-saas.whitesourcesoftware.com/api/v2.0/projects/{project_token}"
         "/alerts/security/groupBy/component?search=status:equals:ACTIVE"
@@ -77,16 +78,22 @@ def get_alerts_by_library(project_token: str, jwt_token: str) -> dict[str, Any]:
     response = requests.get(url, headers=headers)
 
     data = response.json()["retVal"]
-    if not isinstance(data, dict):
-        raise ValueError("Expected data to be a dictionary")
-    for key in data:
-        if not isinstance(key, str):
-            raise ValueError(f"Expected key '{key}' to be a string")
-    logger.info("Successfully finished getting alerts by library")
+    if not isinstance(data, list):
+        raise ValueError("Expected data to be a list")
+    for item in data:
+        if not isinstance(item, dict):
+            raise ValueError(f"Expected item '{item}' to be a dictionary")
+        for key in item:
+            if not isinstance(key, str):
+                raise ValueError(f"Expected key '{key}' to be a string")
+    thc_logger.highlight(
+        level=THCLoggerHighlightLevel.INFO,
+        message="Successfully finished getting alerts by library",
+    )
     return data
 
 
-def get_vulnerabilities_by_project(project_token: str, jwt_token: str) -> dict[str, Any]:
+def get_vulnerabilities_by_project(project_token: str, jwt_token: str) -> list[dict[str, Any]]:
     """Retrieves vulnerabilities for a given project.
 
     Args:
@@ -94,18 +101,27 @@ def get_vulnerabilities_by_project(project_token: str, jwt_token: str) -> dict[s
         jwt_token (str): JWT token for authentication.
 
     Returns:
-        dict: Vulnerabilities for the project.
+        list[dict[str, Any]]: Vulnerabilities for the project.
     """
-    logger.info("Start getting vulnerabilities by project")
+    thc_logger.highlight(
+        level=THCLoggerHighlightLevel.INFO,
+        message="Start getting vulnerabilities by project",
+    )
     url = f"https://api-saas.whitesourcesoftware.com/api/v2.0/projects/{project_token}/alerts/security?search=status:equals:ACTIVE"
     headers = {"Authorization": f"Bearer {jwt_token}", "Content-Type": "application/json"}
     response = requests.get(url, headers=headers)
 
     data = response.json()["retVal"]
-    if not isinstance(data, dict):
-        raise ValueError("Expected data to be a dictionary")
-    for key in data:
-        if not isinstance(key, str):
-            raise ValueError(f"Expected key '{key}' to be a string")
-    logger.info("Successfully finished getting vulnerabilities by project")
+    if not isinstance(data, list):
+        raise ValueError("Expected data to be a list")
+    for item in data:
+        if not isinstance(item, dict):
+            raise ValueError(f"Expected item '{item}' to be a dictionary")
+        for key in item:
+            if not isinstance(key, str):
+                raise ValueError(f"Expected key '{key}' to be a string")
+    thc_logger.highlight(
+        level=THCLoggerHighlightLevel.INFO,
+        message="Successfully finished getting vulnerabilities by project",
+    )
     return data

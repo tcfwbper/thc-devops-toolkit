@@ -14,16 +14,11 @@
 # ==============================================================================
 import argparse
 import getpass
-import logging
 import shutil
 from pathlib import Path
 
+from thc_devops_toolkit.observability import THCLoggerHighlightLevel, thc_logger
 from thc_devops_toolkit.version_control.git import GitCredential, GitRepo
-
-# Set up a default logger for this module
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
 
 repo_url = "https://github.com/tcfwbper/devpod.git"
 repo_dir = "devpod"
@@ -58,7 +53,7 @@ def main() -> None:
     git_repo.clone(branch=branch)
 
     # Git remotes
-    logger.info("git remotes: %s", git_repo.get_remote_url(mask_token=True))
+    thc_logger.highlight(THCLoggerHighlightLevel.INFO, f"git remotes: {git_repo.get_remote_url(mask_token=True)}")
 
     # Git pull
     git_repo.pull(rebase=True, branch=branch, remote_name="origin")
@@ -66,7 +61,7 @@ def main() -> None:
     # Temporary local path as remote
     shutil.copytree(local_repo_path, local_repo_path_tmp)
     git_repo.set_remote_url(new_url=str(local_repo_path_tmp))
-    logger.info("git remotes: %s", git_repo.get_remote_url(mask_token=True))
+    thc_logger.highlight(THCLoggerHighlightLevel.INFO, f"git remotes: {git_repo.get_remote_url(mask_token=True)}")
 
     # Edit files at the new branch
     git_repo.checkout(ref=new_branch, new_branch=True)

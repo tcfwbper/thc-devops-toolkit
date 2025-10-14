@@ -17,9 +17,9 @@
 Functions include login, pull, push, package, verify chart versions/values, and dependency checking utilities.
 """
 
-import logging
 import os
 import subprocess
+from asyncio.log import logger
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -27,10 +27,8 @@ from typing import Any
 
 from ruamel.yaml import YAML
 
+from thc_devops_toolkit.observability import THCLoggerHighlightLevel, thc_logger
 from thc_devops_toolkit.utils.yaml import get_value_from_dict
-
-# Set up a default logger for this module
-logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -106,15 +104,24 @@ def helm_login(cr_host: str, username: str, password: str) -> None:
     Raises:
         RuntimeError: If login fails.
     """
-    logger.info("Logging in to Helm registry: %s", cr_host)
+    thc_logger.highlight(
+        level=THCLoggerHighlightLevel.INFO,
+        message=f"Logging in to Helm registry: {cr_host}",
+    )
     cmd = ["helm", "registry", "login", cr_host, "-u", username, "--password-stdin"]
     env = os.environ.copy()
     env["HELM_EXPERIMENTAL_OCI"] = "1"
     process = subprocess.run(cmd, input=password.encode("utf-8"), capture_output=True, check=True, env=env)
     if process.returncode != 0:
-        logger.error("Failed to login to Helm registry %s: %s", cr_host, process.stderr.decode("utf-8"))
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.ERROR,
+            message=f"Failed to login to Helm registry {cr_host} (exit code: {process.returncode})",
+        )
         raise RuntimeError(f"Failed to login to Helm registry {cr_host} (exit code: {process.returncode})\n{str(process.stderr, 'UTF-8')}")
-    logger.info("Successfully logged in to Helm registry: %s", cr_host)
+    thc_logger.highlight(
+        level=THCLoggerHighlightLevel.INFO,
+        message=f"Successfully logged in to Helm registry: {cr_host}",
+    )
 
 
 def helm_pull(remote_chart: str, version: str, untar: bool = False) -> None:
@@ -128,7 +135,10 @@ def helm_pull(remote_chart: str, version: str, untar: bool = False) -> None:
     Raises:
         RuntimeError: If pull fails.
     """
-    logger.info("Pulling Helm chart: %s, version: %s", remote_chart, version)
+    thc_logger.highlight(
+        level=THCLoggerHighlightLevel.INFO,
+        message=f"Pulling Helm chart {remote_chart} with version {version}",
+    )
     cmd = ["helm", "pull", remote_chart, "--version", version]
     if untar:
         cmd.append("--untar")
@@ -136,11 +146,17 @@ def helm_pull(remote_chart: str, version: str, untar: bool = False) -> None:
     env["HELM_EXPERIMENTAL_OCI"] = "1"
     process = subprocess.run(cmd, capture_output=True, check=True, env=env)
     if process.returncode != 0:
-        logger.error("Failed to pull Helm chart %s: %s", remote_chart, process.stderr.decode("utf-8"))
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.ERROR,
+            message=f"Failed to pull '{remote_chart}' with version {version} (exit code: {process.returncode})",
+        )
         raise RuntimeError(
             f"Failed to pull '{remote_chart}' with version {version} (exit code: {process.returncode})\n{str(process.stderr, 'UTF-8')}"
         )
-    logger.info("Successfully pulled Helm chart: %s", remote_chart)
+    thc_logger.highlight(
+        level=THCLoggerHighlightLevel.INFO,
+        message=f"Successfully pulled Helm chart: {remote_chart}",
+    )
 
 
 def helm_package(chart: Chart) -> None:
@@ -153,17 +169,26 @@ def helm_package(chart: Chart) -> None:
         RuntimeError: If packaging fails.
     """
     chart_path = str(Path(chart.path_prefix) / chart.name)
-    logger.info("Packaging Helm chart at path: %s", chart_path)
+    thc_logger.highlight(
+        level=THCLoggerHighlightLevel.INFO,
+        message=f"Packaging Helm chart at path: {chart_path}",
+    )
     cmd = ["helm", "package", chart_path]
     env = os.environ.copy()
     env["HELM_EXPERIMENTAL_OCI"] = "1"
     process = subprocess.run(cmd, capture_output=True, check=True, env=env)
     if process.returncode != 0:
-        logger.error("Failed to package Helm chart at %s: %s", chart_path, process.stderr.decode("utf-8"))
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.ERROR,
+            message=f"Failed to package Helm chart at path '{chart_path}' (exit code: {process.returncode})",
+        )
         raise RuntimeError(
             f"Failed to package Helm chart on path '{chart_path}' (exit code: {process.returncode})\n{str(process.stderr, 'UTF-8')}"
         )
-    logger.info("Successfully packaged Helm chart: %s", chart_path)
+    thc_logger.highlight(
+        level=THCLoggerHighlightLevel.INFO,
+        message=f"Successfully packaged Helm chart: {chart.name}",
+    )
 
 
 def helm_push(chart: Chart, repository: str) -> None:
@@ -177,17 +202,26 @@ def helm_push(chart: Chart, repository: str) -> None:
         RuntimeError: If push fails.
     """
     tgz_file = chart.name + "-" + chart.version + ".tgz"
-    logger.info("Pushing Helm chart %s to repository: %s", tgz_file, repository)
+    thc_logger.highlight(
+        level=THCLoggerHighlightLevel.INFO,
+        message=f"Pushing Helm chart {tgz_file} to repository: {repository}",
+    )
     cmd = ["helm", "push", tgz_file, repository]
     env = os.environ.copy()
     env["HELM_EXPERIMENTAL_OCI"] = "1"
     process = subprocess.run(cmd, capture_output=True, check=True, env=env)
     if process.returncode != 0:
-        logger.error("Failed to push Helm chart %s: %s", tgz_file, process.stderr.decode("utf-8"))
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.ERROR,
+            message=f"Failed to push '{tgz_file}' to '{repository}' (exit code: {process.returncode})\n{str(process.stderr, 'UTF-8')}",
+        )
         raise RuntimeError(
             f"Failed to push '{tgz_file}' to '{repository}' (exit code: {process.returncode})\n{str(process.stderr, 'UTF-8')}"
         )
-    logger.info("Successfully pushed Helm chart: %s", tgz_file)
+    thc_logger.highlight(
+        level=THCLoggerHighlightLevel.INFO,
+        message=f"Successfully pushed Helm chart: {tgz_file}",
+    )
 
 
 def verify_chart_version(
@@ -206,21 +240,28 @@ def verify_chart_version(
     chart_root = Path(chart.path_prefix) / chart.name
     chart_yaml: Path = chart_root / "Chart.yaml"
     yaml = YAML(typ="safe")
-    logger.info("Verifying chart version for %s", chart_yaml)
+    thc_logger.highlight(
+        level=THCLoggerHighlightLevel.INFO,
+        message=f"Verifying chart version for {chart_yaml}",
+    )
     chart_data = yaml.load(chart_yaml)
     if not chart_data or "version" not in chart_data:
-        logger.error("Chart version not found in %s/Chart.yaml", chart_root)
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.ERROR,
+            message=f"Chart version not found in {chart_root}/Chart.yaml",
+        )
         return False
     cur_chart_version = chart_data["version"]
     if cur_chart_version != expected_chart_version:
-        logger.error(
-            "Chart version mismatch for %s: expected %s, found %s",
-            chart_root,
-            expected_chart_version,
-            cur_chart_version,
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.ERROR,
+            message=f"Chart version mismatch for {chart_root}: expected {expected_chart_version}, found {cur_chart_version}",
         )
         return False
-    logger.info("Chart version verified: %s", cur_chart_version)
+    thc_logger.highlight(
+        level=THCLoggerHighlightLevel.INFO,
+        message=f"Chart version verified: {cur_chart_version}",
+    )
     return True
 
 
@@ -241,41 +282,46 @@ def verify_chart_values(
     chart_root = Path(chart.path_prefix) / chart.name
     values_yaml: Path = chart_root / "values.yaml"
     yaml = YAML(typ="safe")
-    logger.info("Verifying chart values for %s", values_yaml)
+    thc_logger.highlight(
+        level=THCLoggerHighlightLevel.INFO,
+        message=f"Verifying chart values for {values_yaml}",
+    )
     values_data = yaml.load(values_yaml)
     # Check if the checklist is a dictionary
     if not isinstance(check_list, dict):
-        logger.error(
-            "Check list for %s is not a dictionary",
-            chart_root,
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.ERROR,
+            message=f"Check list for {chart_root} is not a dictionary",
         )
         return False
     # Check if the values match the checklist
     for key, value in check_list.items():
         if not isinstance(key, str):
-            logger.error(
-                "Key %s in check_list for %s is not a string",
-                key,
-                chart_root,
+            thc_logger.highlight(
+                level=THCLoggerHighlightLevel.ERROR,
+                message=f"Key {key} in check_list for {chart_root} is not a string",
             )
             are_values_correct = False
             continue
         cur_value, get_value_success = get_value_from_dict(values_data, key)
         if not get_value_success:
-            logger.error("Key %s not found in values.yaml for chart %s", key, chart_root)
+            thc_logger.highlight(
+                level=THCLoggerHighlightLevel.ERROR,
+                message=f"Key {key} not found in values.yaml for chart {chart_root}",
+            )
             are_values_correct = False
             continue
         if not cur_value == value:
-            logger.error(
-                "Values mismatch for %s: expected %s=%s, found %s",
-                chart_root,
-                key,
-                value,
-                cur_value,
+            thc_logger.highlight(
+                level=THCLoggerHighlightLevel.ERROR,
+                message=f"Values mismatch for {chart_root}: expected {key}={value}, found {cur_value}",
             )
             are_values_correct = False
     if are_values_correct:
-        logger.info("All chart values verified for %s", chart_root)
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.INFO,
+            message=f"All chart values verified for {chart_root}",
+        )
     return are_values_correct
 
 

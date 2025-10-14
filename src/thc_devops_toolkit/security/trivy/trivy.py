@@ -13,13 +13,11 @@
 # limitations under the License.
 # ==============================================================================
 """A collection of utilities for Trivy security scanning."""
-import logging
 import subprocess
 from importlib import resources
 from pathlib import Path
 
-# Set up a default logger for this module
-logger = logging.getLogger(__name__)
+from thc_devops_toolkit.observability import THCLoggerHighlightLevel, thc_logger
 
 
 def get_trivy_tpl(name: str) -> str:
@@ -60,7 +58,10 @@ def trivy_scan(cr_host: str, image_name: str, image_tag: str, output_file: str |
     process = subprocess.run(cmd, capture_output=True, check=True)
     if process.returncode != 0:
         raise RuntimeError(f"Failed to scan image: {full_image_name} (exit code: {process.returncode}){str(process.stderr, 'UTF-8')}")
-    logger.info("Trivy scan completed for image: %s", full_image_name)
+    thc_logger.highlight(
+        level=THCLoggerHighlightLevel.INFO,
+        message=f"Trivy scan completed for image: {full_image_name}",
+    )
 
 
 def trivy_convert(input_path: str | Path, output_path: str | Path, template: str | Path) -> None:
@@ -90,4 +91,7 @@ def trivy_convert(input_path: str | Path, output_path: str | Path, template: str
         raise RuntimeError(
             f"Failed to convert trivy template: {input_path} (exit code: {process.returncode}){str(process.stderr, 'UTF-8')}"
         )
-    logger.info("Trivy conversion completed: %s", output_path)
+    thc_logger.highlight(
+        level=THCLoggerHighlightLevel.INFO,
+        message=f"Trivy conversion completed: {output_path}",
+    )

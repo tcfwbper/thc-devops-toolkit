@@ -15,7 +15,6 @@
 """A collection of utilities for DVC version control tasks."""
 import bisect
 import json
-import logging
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -24,8 +23,7 @@ from typing import Any
 import yaml  # type: ignore[import-untyped]
 from dvc.repo import Repo
 
-# Set up a default logger for this module
-logger = logging.getLogger(__name__)
+from thc_devops_toolkit.observability import THCLoggerHighlightLevel, thc_logger
 
 
 @dataclass
@@ -330,7 +328,10 @@ class DvcRepo:
     def init(self) -> None:
         """Initialize a DVC repository at the local path."""
         Repo.init(str(self.local_path))
-        logger.info("Initialized DVC repository at %s", self.local_path)
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.INFO,
+            message=f"Initialized DVC repository at {self.local_path}",
+        )
 
     def _get_repo(self) -> Repo:
         """Get a DVC Repo object for the given path.
@@ -366,7 +367,10 @@ class DvcRepo:
         with repo.config.edit() as conf:
             conf["remote"][remote_name] = remote_dict
 
-        logger.info("Set DVC remote '%s' to local path '%s'", remote_name, remote_path)
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.INFO,
+            message=f"Set DVC remote '{remote_name}' to local path '{remote_path}'",
+        )
 
     def set_remote_s3(  # pylint: disable=too-many-arguments
         self,
@@ -395,7 +399,10 @@ class DvcRepo:
         with repo.config.edit() as conf:
             conf["core"] = {"remote": remote_name}
             conf["remote"][remote_name] = remote_dict
-        logger.info("Set DVC remote '%s' to S3 bucket '%s'", remote_name, s3_bucket)
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.INFO,
+            message=f"Set DVC remote '{remote_name}' to S3 bucket '{s3_bucket}'",
+        )
 
     def add_directory(self, directory: str | Path) -> None:
         """Add a directory to DVC tracking.
@@ -406,7 +413,10 @@ class DvcRepo:
         directory = Path(directory)
         repo = self._get_repo()
         repo.add(str(self.local_path / directory), force=True)
-        logger.info("Added directory '%s' to DVC tracking", directory)
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.INFO,
+            message=f"Added directory '{directory}' to DVC tracking",
+        )
 
     def add_files(
         self,
@@ -420,7 +430,10 @@ class DvcRepo:
         full_file_list = [str(self.local_path / file) for file in files]
         repo = self._get_repo()
         repo.add(targets=full_file_list)
-        logger.info("Added %d files to DVC tracking", len(files))
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.INFO,
+            message=f"Added {len(files)} files to DVC tracking",
+        )
 
     def get_dvc_file(self, target_path: str | Path) -> DvcFile:
         """Load a DVC file for a given target path.
@@ -462,4 +475,7 @@ class DvcRepo:
         """
         repo = self._get_repo()
         repo.push(remote=remote_name)
-        logger.info("Pushed tracked files to DVC remote '%s'", remote_name)
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.INFO,
+            message=f"Pushed tracked files to DVC remote '{remote_name}'",
+        )
