@@ -29,7 +29,7 @@ from thc_devops_toolkit.containerization.helm import (
     verify_dependencies,
 )
 
-example_cr_host = "docker.io"
+example_cr_host = "ghcr.io"
 remote_chart = "oci://ghcr.io/tcfwbper/helm/devpod"  # public chart
 chart_name = "devpod"
 chart_version = "1.0.0"
@@ -40,11 +40,11 @@ common_chart_version = "2.31.3"
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Helm example script")
-    parser.add_argument("--username", required=True, help="Docker registry username")
+    parser.add_argument("--username", required=True, help="GitHub username")
     args = parser.parse_args()
     username = args.username
     remote_chart_private = f"oci://{example_cr_host}/{username}/helm"  # private chart
-    password = getpass.getpass("Docker registry password: ")
+    password = getpass.getpass("GitHub password: ")
 
     cwd = os.getcwd()
     helm_example_dir = Path(__file__).resolve().parent
