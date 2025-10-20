@@ -14,15 +14,8 @@
 # ==============================================================================
 """A collection of utilities for monitoring."""
 
+from .models import GPUStatus, NetworkInterface, NetworkInterfaceStatus, ProcessStatus, SystemStatus, Unit
 from .monitor import Monitor
-from .models import (
-    Unit,
-    NetworkInterface,
-    NetworkInterfaceStatus,
-    ProcessStatus,
-    GPUStatus,
-    SystemStatus,
-)
 
 __all__ = [
     "Monitor",

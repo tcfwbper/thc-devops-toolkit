@@ -12,15 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-from pathlib import Path
 import time
+from pathlib import Path
+
 import psutil
 
-from thc_devops_toolkit.observability.monitor import (
-    Monitor,
-    NetworkInterface,
-)
 from thc_devops_toolkit.observability import thc_logger
+from thc_devops_toolkit.observability.monitor import Monitor, NetworkInterface
+
 
 def main() -> None:
     monitor = Monitor()
@@ -38,6 +37,7 @@ def main() -> None:
     monitor.shutdown()
 
     thc_logger.info("Monitoring stopped.")
+
 
 if __name__ == "__main__":
     main()
