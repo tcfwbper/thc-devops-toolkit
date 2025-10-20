@@ -15,7 +15,7 @@
 
 import argparse
 
-from thc_devops_toolkit.observability import THCLoggerHighlightLevel, thc_logger
+from thc_devops_toolkit.observability import LogLevel, logger
 from thc_devops_toolkit.security.mend_api_helper import (
     get_alerts_by_library,
     get_jwt_token,
@@ -34,13 +34,13 @@ def main() -> None:
     refresh_token = get_refresh_token(args.email, args.user_key)
     jwt_token = get_jwt_token(refresh_token)
     alerts = get_alerts_by_library(args.project_token, jwt_token)
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.INFO,
+    logger.highlight(
+        level=LogLevel.DEBUG,
         message=f"Alerts: {alerts}",
     )
     vulnerabilities = get_vulnerabilities_by_project(args.project_token, jwt_token)
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.INFO,
+    logger.highlight(
+        level=LogLevel.DEBUG,
         message=f"Vulnerabilities: {vulnerabilities}",
     )
 

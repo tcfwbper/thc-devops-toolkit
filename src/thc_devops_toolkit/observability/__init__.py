@@ -14,9 +14,9 @@
 # ==============================================================================
 """A collection of utilities for observability tasks."""
 
-from .logger import THCLoggerHighlightLevel, thc_logger
+from .logger import LogLevel, logger
 
 __all__ = [
-    "THCLoggerHighlightLevel",
-    "thc_logger",
+    "LogLevel",
+    "logger",
 ]

@@ -24,7 +24,7 @@ from typing import Any
 import pika
 from pika.adapters.blocking_connection import BlockingChannel
 
-from thc_devops_toolkit.observability import THCLoggerHighlightLevel, thc_logger
+from thc_devops_toolkit.observability import LogLevel, logger
 
 
 class RabbitMQActions(Enum):
@@ -88,7 +88,7 @@ class RabbitMQManager:  # pylint: disable=too-many-instance-attributes
             bool: True if registration is successful, False otherwise.
         """
         if config.message_queue is None or config.exchange_name == "" or config.routing_key == "":
-            thc_logger.highlight(level=THCLoggerHighlightLevel.WARNING, message="[RabbitMQ] Invalid configuration for registration.")
+            logger.highlight(level=LogLevel.WARNING, message="[RabbitMQ] Invalid configuration for registration.")
             return False
 
         if action == RabbitMQActions.SEND:
@@ -101,11 +101,11 @@ class RabbitMQManager:  # pylint: disable=too-many-instance-attributes
         chan_id = "/".join([config.exchange_name, config.routing_key])
         if chan_id not in chan_dict:
             chan_dict[chan_id] = config
-            thc_logger.info("[RabbitMQ] Channel %s registered.", chan_id)
+            logger.info("[RabbitMQ] Channel %s registered.", chan_id)
             return True
 
-        thc_logger.highlight(
-            level=THCLoggerHighlightLevel.WARNING,
+        logger.highlight(
+            level=LogLevel.WARNING,
             message=f"[RabbitMQ] Channel {chan_id} already registered to {action}, ignored.",
         )
         return False
@@ -113,24 +113,24 @@ class RabbitMQManager:  # pylint: disable=too-many-instance-attributes
     def run(self) -> None:
         """Starts all registered sender and receiver threads."""
         for receiver_id, receiver_config in self.receivers.items():
-            thc_logger.info("[RabbitMQ] starting receiver: %s", receiver_id)
+            logger.info("[RabbitMQ] starting receiver: %s", receiver_id)
             thread = Thread(
                 target=self.recv,
                 args=(receiver_config,),
                 daemon=True,
             )
             thread.start()
-            thc_logger.info("[RabbitMQ] receiver: %s started", receiver_id)
+            logger.info("[RabbitMQ] receiver: %s started", receiver_id)
             self.threads.append(thread)
         for sender_id, sender_config in self.senders.items():
-            thc_logger.info("[RabbitMQ] starting sender: %s", sender_id)
+            logger.info("[RabbitMQ] starting sender: %s", sender_id)
             thread = Thread(
                 target=self.send,
                 args=(sender_config,),
                 daemon=True,
             )
             thread.start()
-            thc_logger.info("[RabbitMQ] sender: %s started", sender_id)
+            logger.info("[RabbitMQ] sender: %s started", sender_id)
             self.threads.append(thread)
 
     @staticmethod
@@ -186,18 +186,18 @@ class RabbitMQManager:  # pylint: disable=too-many-instance-attributes
                 properties (Any): Properties.
                 body (bytes): Message body.
             """
-            thc_logger.info("[RabbitMQ] data receive from %s/%s", config.exchange_name, config.routing_key)
+            logger.info("[RabbitMQ] data receive from %s/%s", config.exchange_name, config.routing_key)
             try:
                 config.message_queue.put(body)
             except Exception as exception:  # pylint: disable=broad-except
-                thc_logger.highlight(
-                    level=THCLoggerHighlightLevel.ERROR,
+                logger.highlight(
+                    level=LogLevel.ERROR,
                     message=f"[RabbitMQ] Failed to put data into queue {config.message_queue}: {exception}",
                 )
 
         while not self.shutdown_event.is_set():
             try:
-                thc_logger.info("[RabbitMQ] %s/%s starting...", config.exchange_name, config.routing_key)
+                logger.info("[RabbitMQ] %s/%s starting...", config.exchange_name, config.routing_key)
                 connection = self._connect(
                     host=config.host,
                     port=config.port,
@@ -216,13 +216,13 @@ class RabbitMQManager:  # pylint: disable=too-many-instance-attributes
             except Exception as exception:  # pylint: disable=broad-except
                 if self.shutdown_event.is_set():
                     break
-                thc_logger.info(
+                logger.info(
                     "[RabbitMQ] %s/%s restart...",
                     config.exchange_name,
                     config.routing_key,
                 )
-                thc_logger.highlight(
-                    level=THCLoggerHighlightLevel.ERROR,
+                logger.highlight(
+                    level=LogLevel.ERROR,
                     message=f"[RabbitMQ] Error occurred: {exception}",
                 )
                 time.sleep(10)
@@ -247,7 +247,7 @@ class RabbitMQManager:  # pylint: disable=too-many-instance-attributes
                 channel = connection.channel()
                 channel.exchange_declare(exchange=config.exchange_name, exchange_type=config.exchange_type)
                 channel.basic_publish(exchange=config.exchange_name, routing_key=config.routing_key, body=data)
-                thc_logger.info(
+                logger.info(
                     "[RabbitMQ] data send to %s/%s",
                     config.exchange_name,
                     config.routing_key,
@@ -258,8 +258,8 @@ class RabbitMQManager:  # pylint: disable=too-many-instance-attributes
             except Exception as exception:  # pylint: disable=broad-except
                 if self.shutdown_event.is_set():
                     break
-                thc_logger.highlight(
-                    level=THCLoggerHighlightLevel.ERROR,
+                logger.highlight(
+                    level=LogLevel.ERROR,
                     message=f"[RabbitMQ] Error occurred: {exception}",
                 )
                 # Brief pause before retry
@@ -269,7 +269,7 @@ class RabbitMQManager:  # pylint: disable=too-many-instance-attributes
 
     def shutdown(self) -> None:
         """Gracefully shuts down the RabbitMQ manager and all threads."""
-        thc_logger.info("[RabbitMQ] Graceful shutdown...")
+        logger.info("[RabbitMQ] Graceful shutdown...")
         self.shutdown_event.set()
 
         # Close all channels
@@ -281,9 +281,9 @@ class RabbitMQManager:  # pylint: disable=too-many-instance-attributes
         for thread in self.threads:
             thread.join(timeout=5.0)
             if thread.is_alive():
-                thc_logger.highlight(
-                    level=THCLoggerHighlightLevel.WARNING,
+                logger.highlight(
+                    level=LogLevel.WARNING,
                     message=f"[RabbitMQ] Thread {thread.name} did not stop within timeout",
                 )
 
-        thc_logger.info("[RabbitMQ] Graceful shutdown completed")
+        logger.info("[RabbitMQ] Graceful shutdown completed")

@@ -7,8 +7,7 @@ python main.py --username <docker_registry_username>
 ```
 
 Make sure
-- `docker` has been downloaded
-- `$USER` has been added to docker group
+- `git` has been installed.
 - `helmv3` has been downloaded
 
 before run this example.

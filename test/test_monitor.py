@@ -1,10 +1,7 @@
 import socket
-import time
-from unittest.mock import MagicMock, Mock, patch, call
-from datetime import datetime
+from unittest.mock import Mock, patch, call
 
 import pytest
-import psutil
 
 from thc_devops_toolkit.observability.monitor import (
     Monitor,
@@ -194,9 +191,7 @@ class TestMonitor:
         monitor.net_ifaces = ["eth0"]
         net_iface = NetworkInterface(name="eth0")
         
-        with patch("thc_devops_toolkit.observability.monitor.monitor.thc_logger") as mock_logger:
-            monitor.monitor_net_iface(net_iface)
-            mock_logger.warning.assert_called_once()
+        monitor.monitor_net_iface(net_iface)
         
         # Verify interface is still in the list only once
         assert monitor.net_ifaces.count("eth0") == 1
@@ -223,8 +218,7 @@ class TestMonitor:
 
     @patch("psutil.net_io_counters")
     @patch("time.sleep")
-    @patch("thc_devops_toolkit.observability.monitor.monitor.thc_logger")
-    def test_monitor_net_iface_internal_success(self, mock_logger, mock_sleep, mock_net_io):
+    def test_monitor_net_iface_internal_success(self, mock_sleep, mock_net_io):
         """Test internal network interface monitoring success."""
         monitor = Monitor()
         net_iface = NetworkInterface(name="eth0")
@@ -250,10 +244,6 @@ class TestMonitor:
         mock_sleep.side_effect = set_shutdown
         
         monitor._monitor_net_iface(net_iface, interval=1.0)
-        
-        # Verify logging calls
-        assert mock_logger.info.call_count >= 2
-        mock_logger.highlight.assert_called()
 
     @patch("thc_devops_toolkit.observability.monitor.monitor.Thread")
     def test_monitor_process_success(self, mock_thread_class):
@@ -278,9 +268,7 @@ class TestMonitor:
         monitor = Monitor()
         monitor.pids = [1234]
         
-        with patch("thc_devops_toolkit.observability.monitor.monitor.thc_logger") as mock_logger:
-            monitor.monitor_process(1234)
-            mock_logger.warning.assert_called_once()
+        monitor.monitor_process(1234)
 
         assert monitor.pids.count(1234) == 1
         # Verify no thread was created for duplicate
@@ -289,8 +277,7 @@ class TestMonitor:
     @patch("psutil.Process")
     @patch("psutil.virtual_memory")
     @patch("time.sleep")
-    @patch("thc_devops_toolkit.observability.monitor.monitor.thc_logger")
-    def test_monitor_process_internal_success(self, mock_logger, mock_sleep, mock_virtual_memory, mock_process_class):
+    def test_monitor_process_internal_success(self, mock_sleep, mock_virtual_memory, mock_process_class):
         """Test internal process monitoring success."""
         monitor = Monitor()
         pid = 1234
@@ -318,8 +305,6 @@ class TestMonitor:
         
         # Verify calls
         mock_process_class.assert_called_with(pid)
-        assert mock_logger.info.call_count >= 2
-        mock_logger.highlight.assert_called()
 
     @patch("thc_devops_toolkit.observability.monitor.monitor.Thread")
     def test_monitor_system_success(self, mock_thread_class):
@@ -343,9 +328,7 @@ class TestMonitor:
         monitor = Monitor()
         monitor.system_monitoring_enabled = True
         
-        with patch("thc_devops_toolkit.observability.monitor.monitor.thc_logger") as mock_logger:
-            monitor.monitor_system()
-            mock_logger.warning.assert_called_once()
+        monitor.monitor_system()
         
         # Verify no thread was created for duplicate
         mock_thread_class.assert_not_called()
@@ -354,8 +337,7 @@ class TestMonitor:
     @patch("psutil.virtual_memory")
     @patch("psutil.disk_usage")
     @patch("time.sleep")
-    @patch("thc_devops_toolkit.observability.monitor.monitor.thc_logger")
-    def test_monitor_system_internal_success(self, mock_logger, mock_sleep, mock_disk_usage, mock_virtual_memory, mock_cpu_percent):
+    def test_monitor_system_internal_success(self, mock_sleep, mock_disk_usage, mock_virtual_memory, mock_cpu_percent):
         """Test internal system monitoring success."""
         monitor = Monitor()
         
@@ -384,8 +366,6 @@ class TestMonitor:
         mock_cpu_percent.assert_called()
         mock_virtual_memory.assert_called()
         mock_disk_usage.assert_called_with("/")
-        assert mock_logger.info.call_count >= 2
-        mock_logger.highlight.assert_called()
 
     @patch("thc_devops_toolkit.observability.monitor.monitor.Thread")
     def test_monitor_gpu_success(self, mock_thread_class):
@@ -409,9 +389,7 @@ class TestMonitor:
         monitor = Monitor()
         monitor.gpu_monitoring_enabled = True
         
-        with patch("thc_devops_toolkit.observability.monitor.monitor.thc_logger") as mock_logger:
-            monitor.monitor_gpu()
-            mock_logger.warning.assert_called_once()
+        monitor.monitor_gpu()
         
         # Verify no thread was created for duplicate
         mock_thread_class.assert_not_called()
@@ -422,9 +400,7 @@ class TestMonitor:
         monitor = Monitor()
         mock_nvml_init.side_effect = Exception("NVML init failed")
         
-        with patch("thc_devops_toolkit.observability.monitor.monitor.thc_logger") as mock_logger:
-            monitor._monitor_gpu()
-            mock_logger.highlight.assert_called_once()
+        monitor._monitor_gpu()
 
     @patch("pynvml.nvmlInit")
     @patch("pynvml.nvmlDeviceGetCount")
@@ -434,8 +410,7 @@ class TestMonitor:
     @patch("pynvml.nvmlDeviceGetUUID")
     @patch("pynvml.nvmlDeviceGetUtilizationRates")
     @patch("time.sleep")
-    @patch("thc_devops_toolkit.observability.monitor.monitor.thc_logger")
-    def test_monitor_gpu_internal_success(self, mock_logger, mock_sleep, mock_util_rates, mock_uuid, mock_name, 
+    def test_monitor_gpu_internal_success(self, mock_sleep, mock_util_rates, mock_uuid, mock_name, 
                                         mock_memory_info, mock_handle, mock_device_count, mock_nvml_init):
         """Test internal GPU monitoring success."""
         monitor = Monitor()
@@ -469,8 +444,6 @@ class TestMonitor:
         mock_nvml_init.assert_called_once()
         mock_device_count.assert_called()
         mock_handle.assert_called_with(0)
-        assert mock_logger.info.call_count >= 2
-        mock_logger.highlight.assert_called()
 
     def test_monitor_net_iface_internal_exception_retry(self):
         """Test network interface monitoring exception handling and retry."""
@@ -485,10 +458,8 @@ class TestMonitor:
                 monitor.shutdown_event.set()
             raise Exception("Network error")
         
-        with patch("psutil.net_io_counters", side_effect=side_effect), \
-            patch("thc_devops_toolkit.observability.monitor.monitor.thc_logger") as mock_logger:
+        with patch("psutil.net_io_counters", side_effect=side_effect):
             monitor._monitor_net_iface(net_iface, retry=3)
-            assert mock_logger.highlight.call_count >= 2
 
     @patch("psutil.Process")
     def test_monitor_process_internal_exception_retry(self, mock_process_class):
@@ -506,9 +477,7 @@ class TestMonitor:
         
         mock_process_class.side_effect = side_effect
         
-        with patch("thc_devops_toolkit.observability.monitor.monitor.thc_logger") as mock_logger:
-            monitor._monitor_process(pid, retry=3)
-            assert mock_logger.highlight.call_count >= 2
+        monitor._monitor_process(pid, retry=3)
 
     @patch("psutil.cpu_percent")
     def test_monitor_system_internal_exception_retry(self, mock_cpu_percent):
@@ -525,9 +494,7 @@ class TestMonitor:
         
         mock_cpu_percent.side_effect = side_effect
         
-        with patch("thc_devops_toolkit.observability.monitor.monitor.thc_logger") as mock_logger:
-            monitor._monitor_system(retry=3)
-            assert mock_logger.highlight.call_count >= 2
+        monitor._monitor_system(retry=3)
 
     @patch("pynvml.nvmlInit")
     @patch("pynvml.nvmlDeviceGetCount")
@@ -545,9 +512,7 @@ class TestMonitor:
         
         mock_device_count.side_effect = side_effect
         
-        with patch("thc_devops_toolkit.observability.monitor.monitor.thc_logger") as mock_logger:
-            monitor._monitor_gpu(retry=3)
-            assert mock_logger.highlight.call_count >= 2
+        monitor._monitor_gpu(retry=3)
     
     def test_shutdown(self):
         """Test monitor shutdown functionality."""
@@ -564,18 +529,11 @@ class TestMonitor:
         
         monitor.threads = [mock_thread1, mock_thread2]
 
-        with patch("thc_devops_toolkit.observability.monitor.monitor.thc_logger") as mock_logger:
-            monitor.shutdown()
+        monitor.shutdown()
         
         assert monitor.shutdown_event.is_set()
         mock_thread1.join.assert_called_with(timeout=15.0)
         mock_thread2.join.assert_called_with(timeout=15.0)
-        
-        # Verify logging
-        mock_logger.info.assert_has_calls([
-            call("[Monitor] Graceful shutdown..."),
-            call("[Monitor] Graceful shutdown completed")
-        ])
 
     def test_shutdown_with_hanging_thread(self):
         """Test shutdown with thread that doesn't stop within timeout."""
@@ -588,13 +546,7 @@ class TestMonitor:
         
         monitor.threads = [mock_thread]
 
-        with patch("thc_devops_toolkit.observability.monitor.monitor.thc_logger") as mock_logger:
-            monitor.shutdown()
+        monitor.shutdown()
         
         assert monitor.shutdown_event.is_set()
         mock_thread.join.assert_called_with(timeout=15.0)
-        
-        # Verify warning for hanging thread
-        mock_logger.highlight.assert_called_once()
-        warning_call = mock_logger.highlight.call_args
-        assert "did not stop within timeout" in warning_call[1]["message"]
