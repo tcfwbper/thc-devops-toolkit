@@ -19,7 +19,7 @@ from pathlib import Path
 
 from minio import Minio, S3Error
 
-from thc_devops_toolkit.observability import THCLoggerHighlightLevel, thc_logger
+from thc_devops_toolkit.observability import LogLevel, logger
 
 
 def get_minio_service(
@@ -58,8 +58,8 @@ def minio_makedir(minio_: Minio, bucket: str, directory: str | Path | None = Non
     """
     if not minio_.bucket_exists(bucket):
         minio_.make_bucket(bucket)
-        thc_logger.highlight(
-            THCLoggerHighlightLevel.DEBUG,
+        logger.highlight(
+            LogLevel.INFO,
             f"Bucket {bucket} created",
         )
     if directory:
@@ -69,8 +69,8 @@ def minio_makedir(minio_: Minio, bucket: str, directory: str | Path | None = Non
         except S3Error:
             # Directory doesn't exist, create it
             minio_.put_object(bucket, dir_path, BytesIO(b""), 0)
-            thc_logger.highlight(
-                THCLoggerHighlightLevel.DEBUG,
+            logger.highlight(
+                LogLevel.INFO,
                 f"Directory {dir_path} in bucket {bucket} created",
             )
 
@@ -92,8 +92,8 @@ def minio_removedir(minio_: Minio, bucket: str, directory: str | Path | None = N
     if directory is None:
         minio_.remove_bucket(bucket)
     target_path = f"{bucket}/{prefix}" if prefix else bucket
-    thc_logger.highlight(
-        THCLoggerHighlightLevel.DEBUG,
+    logger.highlight(
+        LogLevel.INFO,
         f"Target directory {target_path} removed",
     )
 
@@ -128,7 +128,7 @@ def mirror_dir_to_bucket(
                 object_name = str(file_path.relative_to(source))
             minio_.fput_object(bucket, object_name, str(file_path))
     destination = f"{bucket}/{directory}" if directory else str(bucket)
-    thc_logger.highlight(
-        THCLoggerHighlightLevel.DEBUG,
+    logger.highlight(
+        LogLevel.INFO,
         f"Local directory {source} copied to {destination}",
     )

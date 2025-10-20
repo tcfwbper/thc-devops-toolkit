@@ -10,11 +10,11 @@ import pytest
 from thc_devops_toolkit.observability.logger import (
     ANSIEscapeCode,
     THCLogger,
-    THCLoggerHighlightLevel,
+    LogLevel,
     ansi_format,
     get_file_handler,
     get_timed_rotating_file_handler,
-    thc_logger,
+    logger,
 )
 
 
@@ -145,22 +145,22 @@ class TestFileHandlers:
         assert handler.backupCount == 10
 
 
-class TestTHCLoggerHighlightLevel:
-    """Test cases for THCLoggerHighlightLevel enum."""
+class TestLogLevel:
+    """Test cases for LogLevel enum."""
 
     def test_highlight_level_values(self):
         """Test that highlight levels have correct values."""
-        assert THCLoggerHighlightLevel.ERROR.value == "ERROR"
-        assert THCLoggerHighlightLevel.WARNING.value == "WARNING"
-        assert THCLoggerHighlightLevel.INFO.value == "INFO"
-        assert THCLoggerHighlightLevel.DEBUG.value == "DEBUG"
-        assert THCLoggerHighlightLevel.CRITICAL.value == "CRITICAL"
+        assert LogLevel.ERROR.value == "ERROR"
+        assert LogLevel.WARNING.value == "WARNING"
+        assert LogLevel.INFO.value == "INFO"
+        assert LogLevel.DEBUG.value == "DEBUG"
+        assert LogLevel.CRITICAL.value == "CRITICAL"
 
 
 class TestTHCLogger:
     """Test cases for THCLogger class."""
 
-    def test_thc_logger_initialization_default(self):
+    def test_logger_initialization_default(self):
         """Test THCLogger initialization with default parameters."""
         logger = THCLogger()
         assert logger.name == "thc_devops_toolkit_logger"
@@ -168,7 +168,7 @@ class TestTHCLogger:
         assert logger.formatter is not None
         assert len(logger.handlers) > 0
 
-    def test_thc_logger_initialization_custom(self, string_handler):
+    def test_logger_initialization_custom(self, string_handler):
         """Test THCLogger initialization with custom parameters."""
         custom_formatter = logging.Formatter("%(message)s")
         custom_handlers = [string_handler]
@@ -184,52 +184,52 @@ class TestTHCLogger:
         assert logger.level == logging.INFO
         assert logger.formatter == custom_formatter
 
-    def test_thc_logger_highlight_error(self, string_handler):
+    def test_logger_highlight_error(self, string_handler):
         """Test highlight method with ERROR level."""
         logger = THCLogger(handlers=[string_handler])
-        logger.highlight(THCLoggerHighlightLevel.ERROR, "error message")
+        logger.highlight(LogLevel.ERROR, "error message")
         
         output = string_handler.stream.getvalue()
         assert "error message" in output
         assert "\033[31m" in output  # Red color code
 
-    def test_thc_logger_highlight_warning(self, string_handler):
+    def test_logger_highlight_warning(self, string_handler):
         """Test highlight method with WARNING level."""
         logger = THCLogger(handlers=[string_handler])
-        logger.highlight(THCLoggerHighlightLevel.WARNING, "warning message")
+        logger.highlight(LogLevel.WARNING, "warning message")
         
         output = string_handler.stream.getvalue()
         assert "warning message" in output
         assert "\033[33m" in output  # Yellow color code
 
-    def test_thc_logger_highlight_info(self, string_handler):
+    def test_logger_highlight_info(self, string_handler):
         """Test highlight method with INFO level."""
         logger = THCLogger(handlers=[string_handler])
-        logger.highlight(THCLoggerHighlightLevel.INFO, "info message")
+        logger.highlight(LogLevel.INFO, "info message")
         
         output = string_handler.stream.getvalue()
         assert "info message" in output
         assert "\033[34m" in output  # Blue color code
 
-    def test_thc_logger_highlight_debug(self, string_handler):
+    def test_logger_highlight_debug(self, string_handler):
         """Test highlight method with DEBUG level."""
         logger = THCLogger(handlers=[string_handler])
-        logger.highlight(THCLoggerHighlightLevel.DEBUG, "debug message")
+        logger.highlight(LogLevel.DEBUG, "debug message")
         
         output = string_handler.stream.getvalue()
         assert "debug message" in output
         assert "\033[32m" in output  # Green color code
 
-    def test_thc_logger_highlight_critical(self, string_handler):
+    def test_logger_highlight_critical(self, string_handler):
         """Test highlight method with CRITICAL level."""
         logger = THCLogger(handlers=[string_handler])
-        logger.highlight(THCLoggerHighlightLevel.CRITICAL, "critical message")
+        logger.highlight(LogLevel.CRITICAL, "critical message")
         
         output = string_handler.stream.getvalue()
         assert "critical message" in output
         assert "\033[35m" in output  # Magenta color code
 
-    def test_thc_logger_regular_logging_methods(self, string_handler):
+    def test_logger_regular_logging_methods(self, string_handler):
         """Test that regular logging methods still work."""
         logger = THCLogger(handlers=[string_handler])
         
@@ -248,13 +248,13 @@ class TestTHCLogger:
 
 
 class TestGlobalLogger:
-    """Test cases for the global thc_logger instance."""
+    """Test cases for the global logger instance."""
 
     def test_global_logger_exists(self):
-        """Test that the global thc_logger instance exists and is properly configured."""
-        assert isinstance(thc_logger, THCLogger)
-        assert thc_logger.name == "thc_devops_toolkit_logger"
-        assert thc_logger.level == logging.DEBUG
+        """Test that the global logger instance exists and is properly configured."""
+        assert isinstance(logger, THCLogger)
+        assert logger.name == "thc_devops_toolkit_logger"
+        assert logger.level == logging.DEBUG
 
     def test_global_logger_functionality(self):
         """Test that the global logger can perform basic operations."""
@@ -265,19 +265,19 @@ class TestGlobalLogger:
         test_handler.setFormatter(logging.Formatter('%(message)s'))
         
         # Temporarily replace handlers
-        original_handlers = thc_logger.handlers.copy()
-        thc_logger.handlers.clear()
-        thc_logger.addHandler(test_handler)
+        original_handlers = logger.handlers.copy()
+        logger.handlers.clear()
+        logger.addHandler(test_handler)
         
         try:
-            thc_logger.info("test message")
+            logger.info("test message")
             output = stream.getvalue()
             assert "test message" in output
         finally:
             # Restore original handlers
-            thc_logger.handlers.clear()
+            logger.handlers.clear()
             for handler in original_handlers:
-                thc_logger.addHandler(handler)
+                logger.addHandler(handler)
 
     def test_global_logger_highlight_functionality(self):
         """Test that the global logger highlight method works."""
@@ -288,17 +288,17 @@ class TestGlobalLogger:
         test_handler.setFormatter(logging.Formatter('%(message)s'))
         
         # Temporarily replace handlers
-        original_handlers = thc_logger.handlers.copy()
-        thc_logger.handlers.clear()
-        thc_logger.addHandler(test_handler)
+        original_handlers = logger.handlers.copy()
+        logger.handlers.clear()
+        logger.addHandler(test_handler)
         
         try:
-            thc_logger.highlight(THCLoggerHighlightLevel.INFO, "highlighted test")
+            logger.highlight(LogLevel.INFO, "highlighted test")
             output = stream.getvalue()
             assert "highlighted test" in output
             assert "\033[34m" in output  # Blue color code
         finally:
             # Restore original handlers
-            thc_logger.handlers.clear()
+            logger.handlers.clear()
             for handler in original_handlers:
-                thc_logger.addHandler(handler)
+                logger.addHandler(handler)

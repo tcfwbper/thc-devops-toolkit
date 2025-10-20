@@ -18,12 +18,13 @@ Functions include login, pull, push, build, tag, run, stop, remove, copy, exec, 
 """
 
 import json
+import re
 import subprocess
 import time
 from collections import deque
 from typing import Any
 
-from thc_devops_toolkit.observability import THCLoggerHighlightLevel, thc_logger
+from thc_devops_toolkit.observability import LogLevel, logger
 
 
 def docker_login(cr_host: str, username: str, password: str) -> None:
@@ -37,24 +38,19 @@ def docker_login(cr_host: str, username: str, password: str) -> None:
     Raises:
         RuntimeError: If login fails.
     """
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.INFO,
-        message=f"Logging in to Docker registry: {cr_host} with user: {username}",
-    )
+    logger.info("Logging in to Docker registry: %s with user: %s", cr_host, username)
+    password = re.sub(r"\x1b\[[0-9;]*[A-Za-z~]", "", password)  # Clean ANSI escape codes
     cmd = ["docker", "login", cr_host, "-u", username, "--password-stdin"]
-    process = subprocess.run(cmd, input=password.encode("utf-8"), capture_output=True, check=True)
+    process = subprocess.run(cmd, input=password.encode("utf-8"), capture_output=True, check=False)
     if process.returncode != 0:
-        thc_logger.highlight(
-            level=THCLoggerHighlightLevel.ERROR,
+        logger.highlight(
+            level=LogLevel.ERROR,
             message=f"Failed to login to Docker registry {cr_host}: {process.stderr.decode('utf-8')}",
         )
         raise RuntimeError(
             f"Failed to login to Docker registry {cr_host} (exit code: {process.returncode})\n{process.stderr.decode('utf-8')}"
         )
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.INFO,
-        message=f"Successfully logged in to Docker registry: {cr_host}",
-    )
+    logger.info("Successfully logged in to Docker registry: %s", cr_host)
 
 
 def docker_pull(full_image_name: str) -> None:
@@ -66,23 +62,17 @@ def docker_pull(full_image_name: str) -> None:
     Raises:
         RuntimeError: If pull fails.
     """
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.INFO,
-        message=f"Pulling Docker image: {full_image_name}",
-    )
+    logger.info("Pulling Docker image: %s", full_image_name)
     cmd = ["docker", "pull", full_image_name]
-    process = subprocess.run(cmd, capture_output=True, check=True)
+    process = subprocess.run(cmd, capture_output=True, check=False)
     if process.returncode != 0:
         stderr = process.stderr.decode("utf-8") if process.stderr else ""
-        thc_logger.highlight(
-            level=THCLoggerHighlightLevel.ERROR,
+        logger.highlight(
+            level=LogLevel.ERROR,
             message=f"Failed to pull image: {full_image_name} (exit code: {process.returncode})",
         )
         raise RuntimeError(f"Failed to pull image: {full_image_name} (exit code: {process.returncode})\n{stderr}")
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.INFO,
-        message=f"Successfully pulled Docker image: {full_image_name}",
-    )
+    logger.info("Successfully pulled Docker image: %s", full_image_name)
 
 
 def docker_push(full_image_name: str) -> None:
@@ -94,23 +84,17 @@ def docker_push(full_image_name: str) -> None:
     Raises:
         RuntimeError: If push fails.
     """
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.INFO,
-        message=f"Pushing Docker image: {full_image_name}",
-    )
+    logger.info("Pushing Docker image: %s", full_image_name)
     cmd = ["docker", "push", full_image_name]
-    process = subprocess.run(cmd, capture_output=True, check=True)
+    process = subprocess.run(cmd, capture_output=True, check=False)
     if process.returncode != 0:
         stderr = process.stderr.decode("utf-8") if process.stderr else ""
-        thc_logger.highlight(
-            level=THCLoggerHighlightLevel.ERROR,
+        logger.highlight(
+            level=LogLevel.ERROR,
             message=f"Failed to push image: {full_image_name} (exit code: {process.returncode})",
         )
         raise RuntimeError(f"Failed to push image: {full_image_name} (exit code: {process.returncode})\n{stderr}")
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.INFO,
-        message=f"Successfully pushed Docker image: {full_image_name}",
-    )
+    logger.info("Successfully pushed Docker image: %s", full_image_name)
 
 
 def docker_inspect(target_object: str) -> dict[str, Any]:
@@ -125,23 +109,16 @@ def docker_inspect(target_object: str) -> dict[str, Any]:
     Raises:
         RuntimeError: If inspect fails.
     """
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.INFO,
-        message=f"Inspecting Docker object: {target_object}",
-    )
+    logger.info("Inspecting Docker object: %s", target_object)
     cmd = ["docker", "inspect", target_object]
-    process = subprocess.run(cmd, capture_output=True, check=True)
+    process = subprocess.run(cmd, capture_output=True, check=False)
     if process.returncode != 0:
-        thc_logger.highlight(
-            level=THCLoggerHighlightLevel.ERROR,
+        logger.highlight(
+            level=LogLevel.ERROR,
             message=f"Failed to inspect: {target_object} (exit code: {process.returncode})",
         )
         raise RuntimeError(f"Failed to inspect: {target_object} (exit code: {process.returncode})\n{str(process.stderr, 'UTF-8')}")
     object_info: dict[str, Any] = json.loads(str(process.stdout, "UTF-8"))[0]
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.DEBUG,
-        message=f"Inspection result: {object_info}",
-    )
     return object_info
 
 
@@ -160,10 +137,7 @@ def docker_build(
     Raises:
         RuntimeError: If build fails.
     """
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.INFO,
-        message=f"Building Docker image: {full_image_name} from {docker_file_path}",
-    )
+    logger.info("Building Docker image: %s from %s", full_image_name, docker_file_path)
     cmd = ["docker", "build"]
     if build_args:
         for build_arg in build_args:
@@ -171,17 +145,14 @@ def docker_build(
     cmd.extend(["-t", full_image_name])
     cmd.extend(["-f", docker_file_path])
     cmd.append(".")
-    process = subprocess.run(cmd, capture_output=True, check=True)
+    process = subprocess.run(cmd, capture_output=True, check=False)
     if process.returncode != 0:
-        thc_logger.highlight(
-            level=THCLoggerHighlightLevel.ERROR,
+        logger.highlight(
+            level=LogLevel.ERROR,
             message=f"Failed to build: {full_image_name} (exit code: {process.returncode})",
         )
         raise RuntimeError(f"Failed to build: {full_image_name} (exit code: {process.returncode})\n{str(process.stderr, 'UTF-8')}")
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.INFO,
-        message=f"Successfully built Docker image: {full_image_name}",
-    )
+    logger.info("Successfully built Docker image: %s", full_image_name)
 
 
 def docker_tag(
@@ -197,25 +168,19 @@ def docker_tag(
     Raises:
         RuntimeError: If tagging fails.
     """
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.INFO,
-        message=f"Tagging Docker image: {source_full_image_name} as {target_full_image_name}",
-    )
+    logger.info("Tagging Docker image: %s as %s", source_full_image_name, target_full_image_name)
     cmd = ["docker", "tag", source_full_image_name, target_full_image_name]
-    process = subprocess.run(cmd, capture_output=True, check=True)
+    process = subprocess.run(cmd, capture_output=True, check=False)
     if process.returncode != 0:
-        thc_logger.highlight(
-            level=THCLoggerHighlightLevel.ERROR,
+        logger.highlight(
+            level=LogLevel.ERROR,
             message=f"Failed to tag: {target_full_image_name} from {source_full_image_name} (exit code: {process.returncode})",
         )
         raise RuntimeError(
             f"Failed to tag: {target_full_image_name} from {source_full_image_name} (exit code: {process.returncode})\n"
             f"{str(process.stderr, 'UTF-8')}"
         )
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.INFO,
-        message=f"Successfully tagged Docker image: {target_full_image_name}",
-    )
+    logger.info("Successfully tagged Docker image: %s", target_full_image_name)
 
 
 def docker_run_daemon(  # pylint: disable=too-many-arguments
@@ -244,10 +209,7 @@ def docker_run_daemon(  # pylint: disable=too-many-arguments
     Raises:
         RuntimeError: If run fails.
     """
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.INFO,
-        message=f"Running Docker image: {full_image_name} in daemon mode",
-    )
+    logger.info("Running Docker image: %s in daemon mode", full_image_name)
     cmd = ["docker", "run", "-d"]
     if remove:
         cmd.append("--rm")
@@ -264,18 +226,15 @@ def docker_run_daemon(  # pylint: disable=too-many-arguments
     cmd.append(full_image_name)
     if command:
         cmd.extend(command)
-    process = subprocess.run(cmd, capture_output=True, check=True)
+    process = subprocess.run(cmd, capture_output=True, check=False)
     if process.returncode != 0:
-        thc_logger.highlight(
-            level=THCLoggerHighlightLevel.ERROR,
+        logger.highlight(
+            level=LogLevel.ERROR,
             message=f"Failed to run image: {full_image_name} (exit code: {process.returncode})",
         )
         raise RuntimeError(f"Failed to run image: {full_image_name} (exit code: {process.returncode})\n{str(process.stderr, 'UTF-8')}")
     container_id = str(process.stdout, "UTF-8").strip()
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.INFO,
-        message=f"Successfully started container: {container_id}",
-    )
+    logger.info("Successfully started container: %s", container_id)
     return container_id
 
 
@@ -290,15 +249,12 @@ def docker_stop(obj: str, timeout: int = 10, poll_interval: float = 1.0) -> None
     Raises:
         RuntimeError: If stop fails or container does not stop in time.
     """
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.INFO,
-        message=f"Stopping Docker object: {obj}",
-    )
+    logger.info("Stopping Docker object: %s", obj)
     cmd = ["docker", "stop", obj]
-    process = subprocess.run(cmd, capture_output=True, check=True)
+    process = subprocess.run(cmd, capture_output=True, check=False)
     if process.returncode != 0:
-        thc_logger.highlight(
-            level=THCLoggerHighlightLevel.ERROR,
+        logger.highlight(
+            level=LogLevel.ERROR,
             message=f"Failed to stop: {obj} (exit code: {process.returncode})",
         )
         raise RuntimeError(f"Failed to stop: {obj} (exit code: {process.returncode})\n{str(process.stderr, 'UTF-8')}")
@@ -314,16 +270,13 @@ def docker_stop(obj: str, timeout: int = 10, poll_interval: float = 1.0) -> None
             # If inspect fails, maybe container is gone
             break
         if time.time() - start > timeout:
-            thc_logger.highlight(
-                level=THCLoggerHighlightLevel.ERROR,
+            logger.highlight(
+                level=LogLevel.ERROR,
                 message=f"Timeout waiting for container {obj} to stop",
             )
             raise RuntimeError(f"Timeout waiting for container {obj} to stop")
         time.sleep(poll_interval)
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.INFO,
-        message=f"Successfully stopped Docker object: {obj}",
-    )
+    logger.info("Successfully stopped Docker object: %s", obj)
 
 
 def docker_remove(obj: str, ignore_errors: bool = False, timeout: int = 10, poll_interval: float = 1.0) -> None:
@@ -338,15 +291,12 @@ def docker_remove(obj: str, ignore_errors: bool = False, timeout: int = 10, poll
     Raises:
         RuntimeError: If remove fails and ignore_errors is False, or container not removed in time.
     """
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.INFO,
-        message=f"Removing Docker container: {obj}",
-    )
+    logger.info("Removing Docker container: %s", obj)
     cmd = ["docker", "rm", obj]
-    process = subprocess.run(cmd, capture_output=True, check=True)
+    process = subprocess.run(cmd, capture_output=True, check=False)
     if process.returncode != 0 and not ignore_errors:
-        thc_logger.highlight(
-            level=THCLoggerHighlightLevel.ERROR,
+        logger.highlight(
+            level=LogLevel.ERROR,
             message=f"Failed to remove: {obj} (exit code: {process.returncode})",
         )
         raise RuntimeError(f"Failed to remove: {obj} (exit code: {process.returncode})\n{str(process.stderr, 'UTF-8')}")
@@ -359,18 +309,15 @@ def docker_remove(obj: str, ignore_errors: bool = False, timeout: int = 10, poll
             # If inspect fails, container is gone
             break
         if time.time() - start > timeout:
-            thc_logger.highlight(
-                level=THCLoggerHighlightLevel.ERROR,
+            logger.highlight(
+                level=LogLevel.ERROR,
                 message=f"Timeout waiting for container {obj} to be removed",
             )
             if not ignore_errors:
                 raise RuntimeError(f"Timeout waiting for container {obj} to be removed")
             break
         time.sleep(poll_interval)
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.INFO,
-        message=f"Successfully removed Docker container: {obj}",
-    )
+    logger.info("Successfully removed Docker container: %s", obj)
 
 
 def docker_remove_image(full_image_name: str) -> None:
@@ -382,22 +329,16 @@ def docker_remove_image(full_image_name: str) -> None:
     Raises:
         RuntimeError: If remove fails.
     """
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.INFO,
-        message=f"Removing Docker image: {full_image_name}",
-    )
+    logger.info("Removing Docker image: %s", full_image_name)
     cmd = ["docker", "rmi", full_image_name]
-    process = subprocess.run(cmd, capture_output=True, check=True)
+    process = subprocess.run(cmd, capture_output=True, check=False)
     if process.returncode != 0:
-        thc_logger.highlight(
-            level=THCLoggerHighlightLevel.ERROR,
+        logger.highlight(
+            level=LogLevel.ERROR,
             message=f"Failed to remove image: {full_image_name} (exit code: {process.returncode})",
         )
         raise RuntimeError(f"Failed to remove image: {full_image_name} (exit code: {process.returncode})\n{str(process.stderr, 'UTF-8')}")
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.INFO,
-        message=f"Successfully removed Docker image: {full_image_name}",
-    )
+    logger.info("Successfully removed Docker image: %s", full_image_name)
 
 
 def docker_copy(source: str, target: str) -> None:
@@ -410,22 +351,16 @@ def docker_copy(source: str, target: str) -> None:
     Raises:
         RuntimeError: If copy fails.
     """
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.INFO,
-        message=f"Copying from {source} to {target}",
-    )
+    logger.info("Copying from %s to %s", source, target)
     cmd = ["docker", "cp", source, target]
-    process = subprocess.run(cmd, capture_output=True, check=True)
+    process = subprocess.run(cmd, capture_output=True, check=False)
     if process.returncode != 0:
-        thc_logger.highlight(
-            level=THCLoggerHighlightLevel.ERROR,
+        logger.highlight(
+            level=LogLevel.ERROR,
             message=f"Failed to copy {source} to {target} (exit code: {process.returncode})",
         )
         raise RuntimeError(f"Failed to copy {source} to {target} (exit code: {process.returncode})\n{str(process.stderr, 'UTF-8')}")
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.INFO,
-        message=f"Successfully copied from {source} to {target}",
-    )
+    logger.info("Successfully copied from %s to %s", source, target)
 
 
 def docker_exec(
@@ -446,9 +381,11 @@ def docker_exec(
         ValueError: If command is not provided.
         RuntimeError: If exec fails.
     """
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.INFO,
-        message=f"Executing command in Docker container: {obj} at {workdir}: {' '.join(command) if command else ''}",
+    logger.info(
+        "Executing command in Docker container: %s at %s: %s",
+        obj,
+        workdir,
+        " ".join(command) if command else "",
     )
     cmd = ["docker", "exec"]
     if workdir:
@@ -456,16 +393,16 @@ def docker_exec(
     if obj:
         cmd.append(obj)
     if not command:
-        thc_logger.highlight(
-            level=THCLoggerHighlightLevel.ERROR,
+        logger.highlight(
+            level=LogLevel.ERROR,
             message="Must pass command while docker exec",
         )
         raise ValueError("Must pass command while docker exec")
     cmd.extend(command)
-    process = subprocess.run(cmd, capture_output=True, check=True)
+    process = subprocess.run(cmd, capture_output=True, check=False)
     if process.returncode != 0:
-        thc_logger.highlight(
-            level=THCLoggerHighlightLevel.ERROR,
+        logger.highlight(
+            level=LogLevel.ERROR,
             message=f"Failed to exec {command} at {obj}:{workdir} (exit code: {process.returncode})",
         )
         raise RuntimeError(
@@ -474,21 +411,15 @@ def docker_exec(
     # print output?
     if print_output:
         if process.stdout:
-            thc_logger.highlight(
-                level=THCLoggerHighlightLevel.INFO,
-                message=f"STDOUT from command {' '.join(command)} at {obj}:{workdir}",
-            )
-            thc_logger.highlight(
-                level=THCLoggerHighlightLevel.INFO,
+            logger.info("STDOUT from command %s at %s:%s", " ".join(command), obj, workdir)
+            logger.highlight(
+                level=LogLevel.INFO,
                 message=process.stdout.decode("utf-8"),
             )
         if process.stderr:
-            thc_logger.highlight(
-                level=THCLoggerHighlightLevel.INFO,
-                message=f"STDERR from command {' '.join(command)} at {obj}:{workdir}",
-            )
-            thc_logger.highlight(
-                level=THCLoggerHighlightLevel.INFO,
+            logger.info("STDERR from command %s at %s:%s", " ".join(command), obj, workdir)
+            logger.highlight(
+                level=LogLevel.INFO,
                 message=process.stderr.decode("utf-8"),
             )
 
@@ -507,29 +438,29 @@ def get_image_digest(full_image_name: str, precision: int = 6) -> str:
         ValueError: If precision is out of range.
     """
     if precision < 6 or precision > 64:
-        thc_logger.highlight(
-            level=THCLoggerHighlightLevel.ERROR,
+        logger.highlight(
+            level=LogLevel.ERROR,
             message="Precision must be between 6 and 64",
         )
         raise ValueError("Precision must be between 6 and 64")
     image_info = docker_inspect(full_image_name)
     if not image_info["RepoDigests"]:
-        thc_logger.highlight(
-            level=THCLoggerHighlightLevel.WARNING,
+        logger.highlight(
+            level=LogLevel.WARNING,
             message=f"No RepoDigests found for image: {full_image_name}",
         )
         return ""
     digest = image_info["RepoDigests"][0].split("sha256:")
     if len(digest) < 2:
-        thc_logger.highlight(
-            level=THCLoggerHighlightLevel.WARNING,
+        logger.highlight(
+            level=LogLevel.WARNING,
             message=f"Digest format error for image: {full_image_name}",
         )
         return ""
     full_digest = digest[1]
     if not isinstance(full_digest, str):
-        thc_logger.highlight(
-            level=THCLoggerHighlightLevel.WARNING,
+        logger.highlight(
+            level=LogLevel.WARNING,
             message=f"Digest is not a string for image: {full_image_name}",
         )
         return ""
@@ -551,8 +482,8 @@ def get_image_size(full_image_name: str) -> str:
     image_info = docker_inspect(full_image_name)
     size_key = "Size"
     if size_key not in image_info:
-        thc_logger.highlight(
-            level=THCLoggerHighlightLevel.ERROR,
+        logger.highlight(
+            level=LogLevel.ERROR,
             message=f"Key '{size_key}' not found in docker inspect output for image: {full_image_name}",
         )
         raise KeyError(f"Key '{size_key}' not found in docker inspect output")

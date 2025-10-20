@@ -17,7 +17,7 @@
 import re
 from typing import Any
 
-from thc_devops_toolkit.observability import THCLoggerHighlightLevel, thc_logger
+from thc_devops_toolkit.observability import LogLevel, logger
 
 
 def parse_key_path(key_path: str) -> list[str | int]:
@@ -29,8 +29,8 @@ def parse_key_path(key_path: str) -> list[str | int]:
     Returns:
         list[str | int]: List of keys and indices.
     """
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.DEBUG,
+    logger.highlight(
+        level=LogLevel.DEBUG,
         message=f"Parsing key path: {key_path}",
     )
     tokens = []
@@ -64,8 +64,8 @@ def parse_key_path(key_path: str) -> list[str | int]:
         # Find the next component
         match_ = pattern.match(key_path, pos)
         if not match_:
-            thc_logger.highlight(
-                level=THCLoggerHighlightLevel.ERROR,
+            logger.highlight(
+                level=LogLevel.ERROR,
                 message=f"Invalid key_path at position {pos}: {key_path[pos:]}",
             )
             raise ValueError(f"Invalid key_path at position {pos}: {key_path[pos:]}")
@@ -88,8 +88,8 @@ def parse_key_path(key_path: str) -> list[str | int]:
         # Move to the end of this match
         pos = match_.end()
 
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.DEBUG,
+    logger.highlight(
+        level=LogLevel.DEBUG,
         message=f"Parsed tokens: {tokens}",
     )
     return tokens
@@ -105,8 +105,8 @@ def get_value_from_dict(dictionary: dict[str, Any], key_path: str) -> tuple[Any,
     Returns:
         tuple[Any, bool]: (value, True) if found, (None, False) otherwise.
     """
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.DEBUG,
+    logger.highlight(
+        level=LogLevel.DEBUG,
         message=f"Getting value from dict for key_path: {key_path}",
     )
     tokens = parse_key_path(key_path)
@@ -114,22 +114,19 @@ def get_value_from_dict(dictionary: dict[str, Any], key_path: str) -> tuple[Any,
     for token in tokens:
         if isinstance(dict_iter, list):
             if not isinstance(token, int) or token >= len(dict_iter):
-                thc_logger.highlight(
-                    level=THCLoggerHighlightLevel.WARNING,
+                logger.highlight(
+                    level=LogLevel.WARNING,
                     message=f"Invalid index {token} for {dict_iter}",
                 )
                 return None, False
         elif token not in dict_iter:
-            thc_logger.highlight(
-                level=THCLoggerHighlightLevel.WARNING,
+            logger.highlight(
+                level=LogLevel.WARNING,
                 message=f"Key {token} not found in {dict_iter}",
             )
             return None, False
         dict_iter = dict_iter[token]
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.INFO,
-        message=f"Successfully got value for {key_path}: {dict_iter}",
-    )
+    logger.info("Successfully got value for %s: %s", key_path, dict_iter)
     return dict_iter, True
 
 
@@ -137,8 +134,8 @@ def _get_or_create_next(container: Any, token: str | int, next_token: str | int)
     if isinstance(next_token, int):
         if token in container:
             if not isinstance(container[token], list):
-                thc_logger.highlight(
-                    level=THCLoggerHighlightLevel.ERROR,
+                logger.highlight(
+                    level=LogLevel.ERROR,
                     message=f"Expected list at {token}, got {type(container[token])}",
                 )
                 raise ValueError(f"Expected list at {token}, got {type(container[token])}")
@@ -147,8 +144,8 @@ def _get_or_create_next(container: Any, token: str | int, next_token: str | int)
     elif isinstance(next_token, str):
         if token in container:
             if not isinstance(container[token], dict):
-                thc_logger.highlight(
-                    level=THCLoggerHighlightLevel.ERROR,
+                logger.highlight(
+                    level=LogLevel.ERROR,
                     message=f"Expected dict at {token}, got {type(container[token])}",
                 )
                 raise ValueError(f"Expected dict at {token}, got {type(container[token])}")
@@ -160,8 +157,8 @@ def _get_or_create_next(container: Any, token: str | int, next_token: str | int)
 def _set_final_value(container: Any, token: str | int, value: Any) -> None:
     if isinstance(container, list):
         if not isinstance(token, int):
-            thc_logger.highlight(
-                level=THCLoggerHighlightLevel.ERROR,
+            logger.highlight(
+                level=LogLevel.ERROR,
                 message=f"Expected integer index for list, got {token}",
             )
             raise ValueError(f"Expected integer index for list, got {token}")
@@ -180,8 +177,8 @@ def set_value_to_dict(dictionary: dict[str, Any], key_path: str, value: Any) -> 
         key_path (str): The key path string.
         value (Any): The value to set.
     """
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.DEBUG,
+    logger.highlight(
+        level=LogLevel.DEBUG,
         message=f"Setting value for key_path: {key_path} to {value}",
     )
     tokens = parse_key_path(key_path)
@@ -190,8 +187,8 @@ def set_value_to_dict(dictionary: dict[str, Any], key_path: str, value: Any) -> 
         next_token = tokens[i + 1]
         if isinstance(dict_iter, list):
             if not isinstance(token, int):
-                thc_logger.highlight(
-                    level=THCLoggerHighlightLevel.ERROR,
+                logger.highlight(
+                    level=LogLevel.ERROR,
                     message=f"Expected integer index for list, got {token}",
                 )
                 raise ValueError(f"Expected integer index for list, got {token}")
@@ -204,7 +201,4 @@ def set_value_to_dict(dictionary: dict[str, Any], key_path: str, value: Any) -> 
             dict_iter = _get_or_create_next(dict_iter, token, next_token)
     last_token = tokens[-1]
     _set_final_value(dict_iter, last_token, value)
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.INFO,
-        message=f"Successfully set value for {key_path} to {value}",
-    )
+    logger.info("Successfully set value for %s to %s", key_path, value)

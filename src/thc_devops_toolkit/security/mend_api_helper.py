@@ -18,7 +18,7 @@ from typing import Any
 
 import requests
 
-from thc_devops_toolkit.observability import THCLoggerHighlightLevel, thc_logger
+from thc_devops_toolkit.observability import logger
 
 
 def get_refresh_token(email: str, user_key: str) -> str:
@@ -66,10 +66,7 @@ def get_alerts_by_library(project_token: str, jwt_token: str) -> list[dict[str, 
     Returns:
         list[dict[str, Any]]: Alerts grouped by library.
     """
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.INFO,
-        message="Start getting alerts by library",
-    )
+    logger.info("Start getting alerts by library")
     url = (
         f"https://api-saas.whitesourcesoftware.com/api/v2.0/projects/{project_token}"
         "/alerts/security/groupBy/component?search=status:equals:ACTIVE"
@@ -86,10 +83,7 @@ def get_alerts_by_library(project_token: str, jwt_token: str) -> list[dict[str, 
         for key in item:
             if not isinstance(key, str):
                 raise ValueError(f"Expected key '{key}' to be a string")
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.INFO,
-        message="Successfully finished getting alerts by library",
-    )
+    logger.info("Successfully finished getting alerts by library")
     return data
 
 
@@ -103,10 +97,7 @@ def get_vulnerabilities_by_project(project_token: str, jwt_token: str) -> list[d
     Returns:
         list[dict[str, Any]]: Vulnerabilities for the project.
     """
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.INFO,
-        message="Start getting vulnerabilities by project",
-    )
+    logger.info("Start getting vulnerabilities by project")
     url = f"https://api-saas.whitesourcesoftware.com/api/v2.0/projects/{project_token}/alerts/security?search=status:equals:ACTIVE"
     headers = {"Authorization": f"Bearer {jwt_token}", "Content-Type": "application/json"}
     response = requests.get(url, headers=headers)
@@ -120,8 +111,5 @@ def get_vulnerabilities_by_project(project_token: str, jwt_token: str) -> list[d
         for key in item:
             if not isinstance(key, str):
                 raise ValueError(f"Expected key '{key}' to be a string")
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.INFO,
-        message="Successfully finished getting vulnerabilities by project",
-    )
+    logger.info("Successfully finished getting vulnerabilities by project")
     return data

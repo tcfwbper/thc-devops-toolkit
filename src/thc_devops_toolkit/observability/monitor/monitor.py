@@ -21,7 +21,7 @@ from threading import Event, Thread
 import psutil
 import pynvml
 
-from thc_devops_toolkit.observability.logger import THCLoggerHighlightLevel, thc_logger
+from thc_devops_toolkit.observability.logger import LogLevel, logger
 from thc_devops_toolkit.observability.monitor.models import (
     GPUStatus,
     NetworkInterface,
@@ -62,7 +62,7 @@ class Monitor:
             retry (int): The number of retries on failure before stopping monitoring.
         """
         if net_iface.name in self.net_ifaces:
-            thc_logger.warning("[Monitor] Network interface %s is already being monitored.", net_iface.name)
+            logger.warning("[Monitor] Network interface %s is already being monitored.", net_iface.name)
             return
 
         self.net_ifaces.append(net_iface.name)
@@ -90,7 +90,7 @@ class Monitor:
         failure_count = 0
         while not self.shutdown_event.is_set():
             try:
-                thc_logger.info("[Monitor] Measuring network interface %s statistics...", net_iface.name)
+                logger.info("[Monitor] Measuring network interface %s statistics...", net_iface.name)
                 start_time = datetime.now()
 
                 net_stat = psutil.net_io_counters(pernic=True, nowrap=True)[net_iface.name]
@@ -104,7 +104,7 @@ class Monitor:
                 outbound_2 = net_stat.bytes_sent
 
                 end_time = datetime.now()
-                thc_logger.info("[Monitor] Successfully measured network interface %s statistics.", net_iface.name)
+                logger.info("[Monitor] Successfully measured network interface %s statistics.", net_iface.name)
 
                 net_status = NetworkInterfaceStatus(
                     inbound_rate=round((inbound_2 - inbound_1) / unit.factor, precision),
@@ -112,20 +112,20 @@ class Monitor:
                     unit=unit,
                     timestamp=end_time.strftime("%Y-%m-%d %H:%M:%S"),
                 )
-                thc_logger.highlight(
-                    level=THCLoggerHighlightLevel.INFO, message=f"[Monitor] Network Interface {net_iface.name} status: {net_status}"
+                logger.highlight(
+                    level=LogLevel.INFO, message=f"[Monitor] Network Interface {net_iface.name} status: {net_status}"
                 )
                 failure_count = 0
                 time.sleep(interval - (end_time - start_time).total_seconds())
             except Exception as exception:  # pylint: disable=broad-except
-                thc_logger.highlight(
-                    level=THCLoggerHighlightLevel.ERROR,
+                logger.highlight(
+                    level=LogLevel.ERROR,
                     message=f"[Monitor] Error monitoring network interface {net_iface.name}: {exception}",
                 )
                 failure_count += 1
                 if failure_count >= retry:
-                    thc_logger.highlight(
-                        level=THCLoggerHighlightLevel.ERROR,
+                    logger.highlight(
+                        level=LogLevel.ERROR,
                         message=f"[Monitor] Stopping monitoring for network interface {net_iface.name} after multiple failures.",
                     )
                     break
@@ -148,7 +148,7 @@ class Monitor:
             retry (int): The number of retries on failure before stopping monitoring.
         """
         if pid in self.pids:
-            thc_logger.warning("[Monitor] Process %d is already being monitored.", pid)
+            logger.warning("[Monitor] Process %d is already being monitored.", pid)
             return
 
         self.pids.append(pid)
@@ -176,7 +176,7 @@ class Monitor:
         failure_count = 0
         while not self.shutdown_event.is_set():
             try:
-                thc_logger.info("[Monitor] Measuring process %d statistics...", pid)
+                logger.info("[Monitor] Measuring process %d statistics...", pid)
                 start_time = datetime.now()
 
                 process = psutil.Process(pid)
@@ -189,19 +189,19 @@ class Monitor:
                     memory_unit=memory_unit,
                     timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 )
-                thc_logger.highlight(level=THCLoggerHighlightLevel.INFO, message=f"[Monitor] Process {pid} status: {process_status}")
+                logger.highlight(level=LogLevel.INFO, message=f"[Monitor] Process {pid} status: {process_status}")
 
                 end_time = datetime.now()
-                thc_logger.info("[Monitor] Successfully measured process %d statistics.", pid)
+                logger.info("[Monitor] Successfully measured process %d statistics.", pid)
 
                 failure_count = 0
                 time.sleep(interval - (end_time - start_time).total_seconds())
             except Exception as exception:  # pylint: disable=broad-except
-                thc_logger.highlight(level=THCLoggerHighlightLevel.ERROR, message=f"[Monitor] Error monitoring process {pid}: {exception}")
+                logger.highlight(level=LogLevel.ERROR, message=f"[Monitor] Error monitoring process {pid}: {exception}")
                 failure_count += 1
                 if failure_count >= retry:
-                    thc_logger.highlight(
-                        level=THCLoggerHighlightLevel.ERROR,
+                    logger.highlight(
+                        level=LogLevel.ERROR,
                         message=f"[Monitor] Stopping monitoring for process {pid} after multiple failures.",
                     )
                     break
@@ -224,7 +224,7 @@ class Monitor:
             retry (int): The number of retries on failure before stopping monitoring.
         """
         if self.system_monitoring_enabled:
-            thc_logger.warning("[Monitor] System monitoring is already enabled.")
+            logger.warning("[Monitor] System monitoring is already enabled.")
             return
 
         self.system_monitoring_enabled = True
@@ -252,7 +252,7 @@ class Monitor:
         failure_count = 0
         while not self.shutdown_event.is_set():
             try:
-                thc_logger.info("[Monitor] Measuring system statistics...")
+                logger.info("[Monitor] Measuring system statistics...")
                 start_time = datetime.now()
 
                 memory_info = psutil.virtual_memory()
@@ -268,19 +268,19 @@ class Monitor:
                     disk_unit=disk_unit,
                     timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 )
-                thc_logger.highlight(level=THCLoggerHighlightLevel.INFO, message=f"[Monitor] System status: {system_status}")
+                logger.highlight(level=LogLevel.INFO, message=f"[Monitor] System status: {system_status}")
 
                 end_time = datetime.now()
-                thc_logger.info("[Monitor] Successfully measured system statistics.")
+                logger.info("[Monitor] Successfully measured system statistics.")
 
                 failure_count = 0
                 time.sleep(interval - (end_time - start_time).total_seconds())
             except Exception as exception:  # pylint: disable=broad-except
-                thc_logger.highlight(level=THCLoggerHighlightLevel.ERROR, message=f"[Monitor] Error monitoring system: {exception}")
+                logger.highlight(level=LogLevel.ERROR, message=f"[Monitor] Error monitoring system: {exception}")
                 failure_count += 1
                 if failure_count >= retry:
-                    thc_logger.highlight(
-                        level=THCLoggerHighlightLevel.ERROR, message="[Monitor] Stopping system monitoring after multiple failures"
+                    logger.highlight(
+                        level=LogLevel.ERROR, message="[Monitor] Stopping system monitoring after multiple failures"
                     )
                     break
 
@@ -300,7 +300,7 @@ class Monitor:
             retry (int): The number of retries on failure before stopping monitoring.
         """
         if self.gpu_monitoring_enabled:
-            thc_logger.warning("[Monitor] GPU monitoring is already enabled.")
+            logger.warning("[Monitor] GPU monitoring is already enabled.")
             return
 
         self.gpu_monitoring_enabled = True
@@ -326,15 +326,15 @@ class Monitor:
         try:
             pynvml.nvmlInit()
         except Exception as exception:  # pylint: disable=broad-except
-            thc_logger.highlight(
-                level=THCLoggerHighlightLevel.ERROR, message=f"[Monitor] Failed to initialize NVML for GPU monitoring: {exception}"
+            logger.highlight(
+                level=LogLevel.ERROR, message=f"[Monitor] Failed to initialize NVML for GPU monitoring: {exception}"
             )
             return
 
         failure_count = 0
         while not self.shutdown_event.is_set():
             try:
-                thc_logger.info("[Monitor] Measuring GPU statistics...")
+                logger.info("[Monitor] Measuring GPU statistics...")
                 start_time = datetime.now()
 
                 for gpu_idx in range(pynvml.nvmlDeviceGetCount()):
@@ -351,34 +351,34 @@ class Monitor:
                         memory_unit=memory_unit,
                         timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     )
-                    thc_logger.highlight(level=THCLoggerHighlightLevel.INFO, message=f"[Monitor] GPU status: {gpu_status}")
+                    logger.highlight(level=LogLevel.INFO, message=f"[Monitor] GPU status: {gpu_status}")
 
                 end_time = datetime.now()
-                thc_logger.info("[Monitor] Successfully measured GPU statistics.")
+                logger.info("[Monitor] Successfully measured GPU statistics.")
 
                 failure_count = 0
                 time.sleep(interval - (end_time - start_time).total_seconds())
             except Exception as exception:  # pylint: disable=broad-except
-                thc_logger.highlight(level=THCLoggerHighlightLevel.ERROR, message=f"[Monitor] Error monitoring GPU: {exception}")
+                logger.highlight(level=LogLevel.ERROR, message=f"[Monitor] Error monitoring GPU: {exception}")
                 failure_count += 1
                 if failure_count >= retry:
-                    thc_logger.highlight(
-                        level=THCLoggerHighlightLevel.ERROR, message="[Monitor] Stopping GPU monitoring after multiple failures."
+                    logger.highlight(
+                        level=LogLevel.ERROR, message="[Monitor] Stopping GPU monitoring after multiple failures."
                     )
                     break
 
     def shutdown(self) -> None:
         """Gracefully shuts down the Monitor and all threads."""
-        thc_logger.info("[Monitor] Graceful shutdown...")
+        logger.info("[Monitor] Graceful shutdown...")
         self.shutdown_event.set()
 
         # Wait for all threads to finish with a reasonable timeout
         for thread in self.threads:
             thread.join(timeout=15.0)
             if thread.is_alive():
-                thc_logger.highlight(
-                    level=THCLoggerHighlightLevel.WARNING,
+                logger.highlight(
+                    level=LogLevel.WARNING,
                     message=f"[Monitor] Thread {thread.name} did not stop within timeout",
                 )
 
-        thc_logger.info("[Monitor] Graceful shutdown completed")
+        logger.info("[Monitor] Graceful shutdown completed")

@@ -32,7 +32,7 @@ from thc_devops_toolkit.containerization.docker import (
     get_image_digest,
     get_image_size,
 )
-from thc_devops_toolkit.observability import THCLoggerHighlightLevel, thc_logger
+from thc_devops_toolkit.observability import LogLevel, logger
 
 cr_host = "docker.io"
 image_name = "busybox"
@@ -56,20 +56,16 @@ def main() -> None:
 
     docker_login(cr_host=cr_host, username=username, password=password)
     docker_pull(full_image_name=full_image_name)
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.INFO,
-        message=f"Pulled image {full_image_name} successfully",
-    )
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.INFO,
+    logger.highlight(
+        level=LogLevel.DEBUG,
         message=f"Image info: {docker_inspect(target_object=full_image_name)}",
     )
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.INFO,
+    logger.highlight(
+        level=LogLevel.DEBUG,
         message=f"Image size: {get_image_size(full_image_name=full_image_name)}",
     )
-    thc_logger.highlight(
-        level=THCLoggerHighlightLevel.INFO,
+    logger.highlight(
+        level=LogLevel.DEBUG,
         message=f"Image digest: {get_image_digest(full_image_name=full_image_name, precision=64)}",
     )
     docker_build(

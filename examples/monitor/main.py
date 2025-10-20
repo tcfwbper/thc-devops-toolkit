@@ -17,7 +17,7 @@ from pathlib import Path
 
 import psutil
 
-from thc_devops_toolkit.observability import thc_logger
+from thc_devops_toolkit.observability import logger
 from thc_devops_toolkit.observability.monitor import Monitor, NetworkInterface
 
 
@@ -26,7 +26,7 @@ def main() -> None:
     net_iface = NetworkInterface.from_ip_address("127.0.0.1")
     pid = psutil.Process().pid
 
-    thc_logger.info("Start monitoring...")
+    logger.info("Start monitoring...")
 
     monitor.monitor_net_iface(net_iface=net_iface)
     monitor.monitor_process(pid=pid)
@@ -36,7 +36,7 @@ def main() -> None:
     time.sleep(60)
     monitor.shutdown()
 
-    thc_logger.info("Monitoring stopped.")
+    logger.info("Monitoring stopped.")
 
 
 if __name__ == "__main__":

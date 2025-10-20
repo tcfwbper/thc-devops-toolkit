@@ -142,7 +142,7 @@ def get_timed_rotating_file_handler(
     return TimedRotatingFileHandler(filename=filename, when=when, interval=interval, backupCount=backupCount)
 
 
-class THCLoggerHighlightLevel(Enum):
+class LogLevel(Enum):
     """Enumeration of log levels for highlighted logging.
 
     This enum defines the available log levels that can be used with the highlight method of THCLogger for colored console output.
@@ -189,27 +189,27 @@ class THCLogger(logging.Logger):
             handler.setFormatter(self.formatter)
             self.addHandler(handler)
 
-    def highlight(self, level: THCLoggerHighlightLevel, message: str) -> None:
+    def highlight(self, level: LogLevel, message: str) -> None:
         """Log a message with ANSI color highlighting based on the log level.
 
         This method provides colored console output for different log levels
         to improve readability and visual distinction of log messages.
 
         Args:
-            level (THCLoggerHighlightLevel): The highlight level determining color.
+            level (LogLevel): The highlight level determining color.
             message (str): The message to log with highlighting.
         """
-        if level == THCLoggerHighlightLevel.ERROR:
+        if level == LogLevel.ERROR:
             self.error(ansi_format(text=message, color=ANSIEscapeCode.RED, bold=True, underline=False))
-        elif level == THCLoggerHighlightLevel.WARNING:
+        elif level == LogLevel.WARNING:
             self.warning(ansi_format(text=message, color=ANSIEscapeCode.YELLOW, bold=True, underline=False))
-        elif level == THCLoggerHighlightLevel.INFO:
+        elif level == LogLevel.INFO:
             self.info(ansi_format(text=message, color=ANSIEscapeCode.BLUE, bold=True, underline=False))
-        elif level == THCLoggerHighlightLevel.DEBUG:
+        elif level == LogLevel.DEBUG:
             self.debug(ansi_format(text=message, color=ANSIEscapeCode.GREEN, bold=True, underline=False))
 
-        elif level == THCLoggerHighlightLevel.CRITICAL:
+        elif level == LogLevel.CRITICAL:
             self.critical(ansi_format(text=message, color=ANSIEscapeCode.MAGENTA, bold=True, underline=False))
 
 
-thc_logger = THCLogger()
+logger = THCLogger()
