@@ -1,5 +1,12 @@
 # thc-devops-toolkit
 
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue)](#)
+[![Python](https://img.shields.io/badge/Python-3670A0?logo=python&logoColor=ffdd54)](#)
+[![DevOps](https://img.shields.io/badge/DevOps-009999)](#)
+[![DevOps](https://img.shields.io/badge/MLOps-fc411c)](#)
+[![GitHub](https://img.shields.io/badge/GitHub-%23121011.svg?logo=github&logoColor=white)](https://github.com/tcfwbper?tab=repositories)
+[![LinkedIn](https://custom-icon-badges.demolab.com/badge/LinkedIn-0A66C2?logo=linkedin-white&logoColor=fff)](https://www.linkedin.com/in/tsung-han-chang-31748b318/)
+
 thc-devops-toolkit is a toolkit designed to simplify DevOps workflows, providing automation scripts and utilities to help developers and operations teams improve efficiency.
 
 ## Features
