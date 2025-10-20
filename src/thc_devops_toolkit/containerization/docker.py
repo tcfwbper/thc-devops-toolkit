@@ -284,7 +284,7 @@ def docker_stop(obj: str, timeout: int = 10, poll_interval: float = 1.0) -> None
 
     Args:
         obj (str): The container or object name/ID.
-        timeout (int, optional): Max seconds to wait for stop. Defaults to 30.
+        timeout (int, optional): Max seconds to wait for stop. Defaults to 10.
         poll_interval (float, optional): Seconds between status checks. Defaults to 1.0.
 
     Raises:

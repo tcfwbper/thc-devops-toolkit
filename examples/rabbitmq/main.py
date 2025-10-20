@@ -15,11 +15,10 @@
 import time
 from contextlib import contextmanager
 from pathlib import Path
-from queue import Queue
 from typing import Iterator
 
 from thc_devops_toolkit.containerization.docker import docker_pull, docker_run_daemon, docker_stop
-from thc_devops_toolkit.infrastructure.rabbitmq import RabbitMQActions, RabbitMQManager
+from thc_devops_toolkit.infrastructure.rabbitmq import RabbitMQActions, RabbitMQConfig, RabbitMQManager
 from thc_devops_toolkit.observability import THCLoggerHighlightLevel, thc_logger
 
 rabbitmq_example_dir = Path(__file__).resolve().parent
@@ -57,26 +56,34 @@ def run_rabbitmq_server(
 def rabbitmq_example() -> None:
     """Example demonstrating RabbitMQ manager usage."""
     # Initialize RabbitMQ manager
-    manager = RabbitMQManager(
-        host=rabbitmq_host, port=rabbitmq_port, user=rabbitmq_user, password=rabbitmq_password, exchange_type="direct"
-    )
+    manager = RabbitMQManager()
 
-    # Create queues for sending and receiving messages
-    send_queue: Queue[bytes] = Queue()
-    recv_queue: Queue[bytes] = Queue()
+    # Create RabbitMQConfig for sending and receiving messages
+    sender = RabbitMQConfig(
+        host=rabbitmq_host,
+        port=rabbitmq_port,
+        user=rabbitmq_user,
+        password=rabbitmq_password,
+        exchange_name="test_exchange",
+        exchange_type="direct",
+        routing_key="test_routing_key",
+        tls=False,
+    )
+    receiver = RabbitMQConfig(
+        host=rabbitmq_host,
+        port=rabbitmq_port,
+        user=rabbitmq_user,
+        password=rabbitmq_password,
+        exchange_name="test_exchange",
+        exchange_type="direct",
+        routing_key="test_routing_key",
+        tls=False,
+    )
 
     # 1. Register receiver and sender
-    thc_logger.highlight(
-        THCLoggerHighlightLevel.INFO,
-        "Registering receiver and sender...",
-    )
-    receiver_registered = manager.register(
-        action=RabbitMQActions.RECV, exchange_name="test_exchange", routing_key="test_routing_key", chan=recv_queue
-    )
-
-    sender_registered = manager.register(
-        action=RabbitMQActions.SEND, exchange_name="test_exchange", routing_key="test_routing_key", chan=send_queue
-    )
+    thc_logger.info("[RabbitMQ] Registering receiver and sender...")
+    sender_registered = manager.register(action=RabbitMQActions.SEND, config=sender)
+    receiver_registered = manager.register(action=RabbitMQActions.RECV, config=receiver)
 
     if not receiver_registered or not sender_registered:
         thc_logger.highlight(
@@ -85,26 +92,16 @@ def rabbitmq_example() -> None:
         )
         return
 
-    thc_logger.highlight(
-        THCLoggerHighlightLevel.INFO,
-        "Starting RabbitMQ manager...",
-    )
-
     # 2. Run RabbitMQ manager
-    thc_logger.highlight(
-        THCLoggerHighlightLevel.INFO,
-        "Starting RabbitMQ manager...",
-    )
+    thc_logger.info("Starting RabbitMQ manager...")
+
     manager.run()
 
     # Give some time for connections to establish
     time.sleep(2)
 
     # 3. Put messages to sender and receive from receiver
-    thc_logger.highlight(
-        THCLoggerHighlightLevel.INFO,
-        "Sending messages...",
-    )
+    thc_logger.info("Sending messages...")
     test_messages = [b"Hello, RabbitMQ!", b"This is message 2", b"Message number 3", b"Final test message"]
 
     # Send messages
@@ -113,25 +110,22 @@ def rabbitmq_example() -> None:
             THCLoggerHighlightLevel.INFO,
             f"Putting message {i} into send queue: {message}",
         )
-        send_queue.put(message)
+        sender.message_queue.put(message)
 
     # Receive messages
-    thc_logger.highlight(
-        THCLoggerHighlightLevel.INFO,
-        "Waiting for messages to be received...",
-    )
+    thc_logger.info("Waiting for messages to be received...")
     received_messages = []
 
     # Wait up to 10 seconds for messages to be received
     for i in range(len(test_messages)):
         try:
             # Wait for message with timeout
-            message = recv_queue.get(timeout=5)
+            message = receiver.message_queue.get(timeout=5)
             received_messages.append(message)
         except Exception as exception:
             thc_logger.highlight(
-                THCLoggerHighlightLevel.WARNING,
-                f"Timeout waiting for message {i+1}: {exception}",
+                THCLoggerHighlightLevel.ERROR,
+                f"Error occurred while waiting for message {i+1}: {exception}",
             )
             break
 
@@ -143,20 +137,15 @@ def rabbitmq_example() -> None:
 
     # Verify all messages were received
     if len(received_messages) == len(test_messages):
-        thc_logger.highlight(
-            THCLoggerHighlightLevel.INFO,
-            "All messages successfully sent and received!",
-        )
+        thc_logger.info("All messages successfully sent and received!")
         for sent, received in zip(test_messages, received_messages):
             if sent == received:
-                thc_logger.highlight(
-                    THCLoggerHighlightLevel.INFO,
-                    f"✓ Message verified: {sent}",
-                )
+                thc_logger.info("✓ Message verified: %s", sent)
             else:
-                thc_logger.highlight(
-                    THCLoggerHighlightLevel.ERROR,
-                    f"✗ Message mismatch: sent {sent}, received {received}",
+                thc_logger.error(
+                    "✗ Message mismatch: sent %s, received %s",
+                    sent,
+                    received,
                 )
     else:
         thc_logger.highlight(
@@ -168,31 +157,19 @@ def rabbitmq_example() -> None:
     time.sleep(2)
 
     # 4. Stop RabbitMQ manager
-    thc_logger.highlight(
-        THCLoggerHighlightLevel.INFO,
-        "Stopping RabbitMQ manager...",
-    )
+    thc_logger.info("Stopping RabbitMQ manager...")
     manager.shutdown()
-    thc_logger.highlight(
-        THCLoggerHighlightLevel.INFO,
-        "RabbitMQ manager stopped successfully",
-    )
+    thc_logger.info("RabbitMQ manager stopped successfully")
 
 
 def main() -> None:
     with run_rabbitmq_server(user=rabbitmq_user, password=rabbitmq_password):
-        thc_logger.highlight(
-            THCLoggerHighlightLevel.INFO,
-            "RabbitMQ server is running.",
-        )
+        thc_logger.info("[RabbitMQ] RabbitMQ server is running.")
 
         # Run the RabbitMQ example
         rabbitmq_example()
 
-    thc_logger.highlight(
-        THCLoggerHighlightLevel.INFO,
-        "RabbitMQ server is stopped.",
-    )
+    thc_logger.info("[RabbitMQ] RabbitMQ server is stopped.")
 
 
 if __name__ == "__main__":
