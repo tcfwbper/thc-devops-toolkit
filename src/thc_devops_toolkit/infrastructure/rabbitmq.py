@@ -13,14 +13,16 @@
 # limitations under the License.
 # ==============================================================================
 """RabbitMQ manager for sending and receiving messages using RabbitMQ."""
+import ssl
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from queue import Empty, Queue
 from threading import Event, Thread
 from typing import Any
 
 import pika
+from pika.adapters.blocking_connection import BlockingChannel
 
 from thc_devops_toolkit.observability import THCLoggerHighlightLevel, thc_logger
 
@@ -33,71 +35,60 @@ class RabbitMQActions(Enum):
 
 
 @dataclass
-class RabbitMQChannel:
-    """Represents a RabbitMQ channel configuration.
+class RabbitMQConfig:  # pylint: disable=too-many-instance-attributes
+    """RabbitMQ configuration.
 
     Attributes:
-        chan_id (str): Unique identifier for the channel.
-        queue (Queue[bytes]): Queue for message passing.
-        routing_key (str): RabbitMQ routing key.
+        host (str): RabbitMQ host.
+        port (int): RabbitMQ port.
+        user (str): RabbitMQ user.
+        password (str): RabbitMQ password.
         exchange_name (str): RabbitMQ exchange name.
+        exchange_type (str): RabbitMQ exchange type.
+        routing_key (str): RabbitMQ routing key.
+        tls (bool): Whether to use TLS.
+        message_queue (Queue): Queue for message passing or receiving.
+        channel (BlockingChannel | None): RabbitMQ channel.
     """
 
-    chan_id: str
-    queue: Queue[bytes]
-    routing_key: str
+    host: str
+    port: int
+    user: str
+    password: str
     exchange_name: str
+    exchange_type: str
+    routing_key: str
+    tls: bool
+    message_queue: Queue[bytes] = field(default_factory=Queue, init=False, repr=False)
+    channel: BlockingChannel | None = field(default=None, init=False, repr=False)
 
 
 class RabbitMQManager:  # pylint: disable=too-many-instance-attributes
     """Manages sending and receiving messages using RabbitMQ."""
 
-    def __init__(  # pylint: disable=too-many-arguments
-        self,
-        host: str,
-        port: int,
-        user: str,
-        password: str,
-        exchange_type: str,
-    ) -> None:
-        """Initializes the RabbitMQ manager.
-
-        Args:
-            host (str): RabbitMQ host.
-            port (int): RabbitMQ port.
-            user (str): RabbitMQ user.
-            password (str): RabbitMQ password.
-            exchange_type (str): RabbitMQ exchange type.
-        """
-        self.host = host
-        self.port = port
-        self.exchange_type = exchange_type
-        self.credentials = pika.PlainCredentials(user, password)
-        self.senders: dict[str, RabbitMQChannel] = {}
-        self.receivers: dict[str, RabbitMQChannel] = {}
+    def __init__(self) -> None:
+        """Initializes the RabbitMQ manager."""
+        self.senders: dict[str, RabbitMQConfig] = {}
+        self.receivers: dict[str, RabbitMQConfig] = {}
         self.threads: list[Thread] = []
         self.shutdown_event = Event()
 
     def register(
         self,
         action: RabbitMQActions,
-        exchange_name: str,
-        routing_key: str,
-        chan: Queue[bytes] | None = None,
+        config: RabbitMQConfig,
     ) -> bool:
         """Registers a sender or receiver.
 
         Args:
             action (RabbitMQActions): Action to perform (send or receive).
-            exchange_name (str): RabbitMQ exchange name.
-            routing_key (str): RabbitMQ routing key.
-            chan (Queue[bytes] | None): Queue for sending or receiving messages.
+            config (RabbitMQConfig): RabbitMQ configuration.
 
         Returns:
             bool: True if registration is successful, False otherwise.
         """
-        chan_id = "/".join([exchange_name, routing_key])
-        if chan is None or exchange_name == "" or routing_key == "":
+        if config.message_queue is None or config.exchange_name == "" or config.routing_key == "":
+            thc_logger.highlight(level=THCLoggerHighlightLevel.WARNING, message="[RabbitMQ] Invalid configuration for registration.")
             return False
 
         if action == RabbitMQActions.SEND:
@@ -107,58 +98,78 @@ class RabbitMQManager:  # pylint: disable=too-many-instance-attributes
         else:
             return False
 
+        chan_id = "/".join([config.exchange_name, config.routing_key])
         if chan_id not in chan_dict:
-            chan_dict[chan_id] = RabbitMQChannel(
-                chan_id=chan_id,
-                queue=chan,
-                exchange_name=exchange_name,
-                routing_key=routing_key,
-            )
+            chan_dict[chan_id] = config
+            thc_logger.info("[RabbitMQ] Channel %s registered.", chan_id)
             return True
+
+        thc_logger.highlight(
+            level=THCLoggerHighlightLevel.WARNING,
+            message=f"[RabbitMQ] Channel {chan_id} already registered to {action}, ignored.",
+        )
         return False
 
     def run(self) -> None:
         """Starts all registered sender and receiver threads."""
-        for receiver in self.receivers.values():
-            thc_logger.highlight(
-                level=THCLoggerHighlightLevel.INFO,
-                message=f"[RabbitMQ] start receiver: {receiver}",
-            )
+        for receiver_id, receiver_config in self.receivers.items():
+            thc_logger.info("[RabbitMQ] starting receiver: %s", receiver_id)
             thread = Thread(
                 target=self.recv,
-                args=(
-                    receiver.queue,
-                    receiver.exchange_name,
-                    receiver.routing_key,
-                ),
+                args=(receiver_config,),
                 daemon=True,
             )
             thread.start()
+            thc_logger.info("[RabbitMQ] receiver: %s started", receiver_id)
             self.threads.append(thread)
-        for sender in self.senders.values():
-            thc_logger.highlight(
-                level=THCLoggerHighlightLevel.INFO,
-                message=f"[RabbitMQ] start sender: {sender}",
-            )
+        for sender_id, sender_config in self.senders.items():
+            thc_logger.info("[RabbitMQ] starting sender: %s", sender_id)
             thread = Thread(
                 target=self.send,
-                args=(
-                    sender.queue,
-                    sender.exchange_name,
-                    sender.routing_key,
-                ),
+                args=(sender_config,),
                 daemon=True,
             )
             thread.start()
+            thc_logger.info("[RabbitMQ] sender: %s started", sender_id)
             self.threads.append(thread)
 
-    def recv(self, chan: Queue[bytes], exchange_name: str, routing_key: str) -> None:
+    @staticmethod
+    def _connect(host: str, port: int, user: str, password: str, tls: bool) -> pika.BlockingConnection:
+        """Establish a connection to RabbitMQ server.
+
+        Args:
+            host (str): RabbitMQ server host.
+            port (int): RabbitMQ server port.
+            user (str): RabbitMQ server username.
+            password (str): RabbitMQ server password.
+            tls (bool): Whether to use TLS for the connection.
+        """
+        if tls:
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE  # self-signed
+            ssl_options = pika.SSLOptions(ssl_context)
+            return pika.BlockingConnection(
+                pika.ConnectionParameters(
+                    host=host,
+                    port=port,
+                    credentials=pika.PlainCredentials(user, password),
+                    ssl_options=ssl_options,
+                ),
+            )
+        return pika.BlockingConnection(
+            pika.ConnectionParameters(
+                host=host,
+                port=port,
+                credentials=pika.PlainCredentials(user, password),
+            ),
+        )
+
+    def recv(self, config: RabbitMQConfig) -> None:
         """Receives messages from RabbitMQ and puts them in the queue.
 
         Args:
-            chan (Queue[bytes]): Queue to put received messages.
-            exchange_name (str): RabbitMQ exchange name.
-            routing_key (str): RabbitMQ routing key.
+            config (RabbitMQConfig): RabbitMQ configuration.
         """
 
         def callback(
@@ -175,40 +186,40 @@ class RabbitMQManager:  # pylint: disable=too-many-instance-attributes
                 properties (Any): Properties.
                 body (bytes): Message body.
             """
-            thc_logger.highlight(
-                level=THCLoggerHighlightLevel.INFO,
-                message=f"[RabbitMQ] data receive from {exchange_name}/{routing_key}",
-            )
+            thc_logger.info("[RabbitMQ] data receive from %s/%s", config.exchange_name, config.routing_key)
             try:
-                chan.put(body)
+                config.message_queue.put(body)
             except Exception as exception:  # pylint: disable=broad-except
                 thc_logger.highlight(
                     level=THCLoggerHighlightLevel.ERROR,
-                    message=f"[RabbitMQ] Failed to put data into queue {chan}: {exception}",
+                    message=f"[RabbitMQ] Failed to put data into queue {config.message_queue}: {exception}",
                 )
 
         while not self.shutdown_event.is_set():
             try:
-                thc_logger.highlight(
-                    level=THCLoggerHighlightLevel.INFO,
-                    message=f"[RabbitMQ] {exchange_name}/{routing_key} starting...",
-                )
-                connection = pika.BlockingConnection(
-                    pika.ConnectionParameters(host=self.host, port=self.port, credentials=self.credentials),
+                thc_logger.info("[RabbitMQ] %s/%s starting...", config.exchange_name, config.routing_key)
+                connection = self._connect(
+                    host=config.host,
+                    port=config.port,
+                    user=config.user,
+                    password=config.password,
+                    tls=config.tls,
                 )
                 channel = connection.channel()
-                channel.exchange_declare(exchange=exchange_name, exchange_type=self.exchange_type)
+                config.channel = channel
+                channel.exchange_declare(exchange=config.exchange_name, exchange_type=config.exchange_type)
                 result = channel.queue_declare("", exclusive=True)
                 queue_name = result.method.queue
-                channel.queue_bind(exchange=exchange_name, queue=queue_name, routing_key=routing_key)
+                channel.queue_bind(exchange=config.exchange_name, queue=queue_name, routing_key=config.routing_key)
                 channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=True)
                 channel.start_consuming()
             except Exception as exception:  # pylint: disable=broad-except
                 if self.shutdown_event.is_set():
                     break
-                thc_logger.highlight(
-                    level=THCLoggerHighlightLevel.INFO,
-                    message=f"[RabbitMQ] {exchange_name}/{routing_key} restart...",
+                thc_logger.info(
+                    "[RabbitMQ] %s/%s restart...",
+                    config.exchange_name,
+                    config.routing_key,
                 )
                 thc_logger.highlight(
                     level=THCLoggerHighlightLevel.ERROR,
@@ -216,27 +227,30 @@ class RabbitMQManager:  # pylint: disable=too-many-instance-attributes
                 )
                 time.sleep(10)
 
-    def send(self, chan: Queue[bytes], exchange_name: str, routing_key: str) -> None:
+    def send(self, config: RabbitMQConfig) -> None:
         """Sends messages from the queue to RabbitMQ.
 
         Args:
-            chan (Queue[bytes]): Queue to get messages to send.
-            exchange_name (str): RabbitMQ exchange name.
-            routing_key (str): RabbitMQ routing key.
+            config (RabbitMQConfig): RabbitMQ configuration.
         """
         while not self.shutdown_event.is_set():
             try:
                 # Add timeout to allow shutdown check
-                data = chan.get(block=True, timeout=1)
-                connection = pika.BlockingConnection(
-                    pika.ConnectionParameters(host=self.host, port=self.port, credentials=self.credentials),
+                data = config.message_queue.get(block=True, timeout=1)
+                connection = self._connect(
+                    host=config.host,
+                    port=config.port,
+                    user=config.user,
+                    password=config.password,
+                    tls=config.tls,
                 )
                 channel = connection.channel()
-                channel.exchange_declare(exchange=exchange_name, exchange_type=self.exchange_type)
-                channel.basic_publish(exchange=exchange_name, routing_key=routing_key, body=data)
-                thc_logger.highlight(
-                    level=THCLoggerHighlightLevel.INFO,
-                    message=f"[RabbitMQ] data send to {exchange_name}/{routing_key}",
+                channel.exchange_declare(exchange=config.exchange_name, exchange_type=config.exchange_type)
+                channel.basic_publish(exchange=config.exchange_name, routing_key=config.routing_key, body=data)
+                thc_logger.info(
+                    "[RabbitMQ] data send to %s/%s",
+                    config.exchange_name,
+                    config.routing_key,
                 )
                 connection.close()
             except Empty:
@@ -251,15 +265,17 @@ class RabbitMQManager:  # pylint: disable=too-many-instance-attributes
                 # Brief pause before retry
                 time.sleep(10)
                 if "data" in locals():
-                    chan.put(data)
+                    config.message_queue.put(data)
 
     def shutdown(self) -> None:
         """Gracefully shuts down the RabbitMQ manager and all threads."""
-        thc_logger.highlight(
-            level=THCLoggerHighlightLevel.INFO,
-            message="[RabbitMQ] Initiating graceful shutdown...",
-        )
+        thc_logger.info("[RabbitMQ] Graceful shutdown...")
         self.shutdown_event.set()
+
+        # Close all channels
+        for receiver_config in self.receivers.values():
+            if receiver_config.channel is not None:
+                receiver_config.channel.stop_consuming()
 
         # Wait for all threads to finish with a reasonable timeout
         for thread in self.threads:
@@ -270,7 +286,4 @@ class RabbitMQManager:  # pylint: disable=too-many-instance-attributes
                     message=f"[RabbitMQ] Thread {thread.name} did not stop within timeout",
                 )
 
-        thc_logger.highlight(
-            level=THCLoggerHighlightLevel.INFO,
-            message="[RabbitMQ] Graceful shutdown completed",
-        )
+        thc_logger.info("[RabbitMQ] Graceful shutdown completed")
