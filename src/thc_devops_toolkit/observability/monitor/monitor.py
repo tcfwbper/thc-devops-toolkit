@@ -112,9 +112,7 @@ class Monitor:
                     unit=unit,
                     timestamp=end_time.strftime("%Y-%m-%d %H:%M:%S"),
                 )
-                logger.highlight(
-                    level=LogLevel.INFO, message=f"[Monitor] Network Interface {net_iface.name} status: {net_status}"
-                )
+                logger.highlight(level=LogLevel.INFO, message=f"[Monitor] Network Interface {net_iface.name} status: {net_status}")
                 failure_count = 0
                 time.sleep(interval - (end_time - start_time).total_seconds())
             except Exception as exception:  # pylint: disable=broad-except
@@ -279,9 +277,7 @@ class Monitor:
                 logger.highlight(level=LogLevel.ERROR, message=f"[Monitor] Error monitoring system: {exception}")
                 failure_count += 1
                 if failure_count >= retry:
-                    logger.highlight(
-                        level=LogLevel.ERROR, message="[Monitor] Stopping system monitoring after multiple failures"
-                    )
+                    logger.highlight(level=LogLevel.ERROR, message="[Monitor] Stopping system monitoring after multiple failures")
                     break
 
     def monitor_gpu(
@@ -326,9 +322,7 @@ class Monitor:
         try:
             pynvml.nvmlInit()
         except Exception as exception:  # pylint: disable=broad-except
-            logger.highlight(
-                level=LogLevel.ERROR, message=f"[Monitor] Failed to initialize NVML for GPU monitoring: {exception}"
-            )
+            logger.highlight(level=LogLevel.ERROR, message=f"[Monitor] Failed to initialize NVML for GPU monitoring: {exception}")
             return
 
         failure_count = 0
@@ -362,9 +356,7 @@ class Monitor:
                 logger.highlight(level=LogLevel.ERROR, message=f"[Monitor] Error monitoring GPU: {exception}")
                 failure_count += 1
                 if failure_count >= retry:
-                    logger.highlight(
-                        level=LogLevel.ERROR, message="[Monitor] Stopping GPU monitoring after multiple failures."
-                    )
+                    logger.highlight(level=LogLevel.ERROR, message="[Monitor] Stopping GPU monitoring after multiple failures.")
                     break
 
     def shutdown(self) -> None:

@@ -20,7 +20,6 @@ Functions include login, pull, push, package, verify chart versions/values, and 
 import os
 import re
 import subprocess
-from asyncio.log import logger
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
