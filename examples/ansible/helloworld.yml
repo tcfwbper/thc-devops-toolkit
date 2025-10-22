@@ -1,0 +1,15 @@
+- name: My first play
+  hosts: all
+  become: no
+
+  tasks:
+  - name: Ping my hosts
+    ansible.builtin.ping:
+
+  - name: Print message
+    ansible.builtin.debug:
+      msg: Hello world
+
+  - name: Print environment variable
+    ansible.builtin.debug:
+      msg: "The value of MY_ENV_VAR is {{ MY_ENV_VAR }}"

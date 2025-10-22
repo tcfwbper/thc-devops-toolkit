@@ -51,6 +51,8 @@ python = "^3.10"
 tabulate = "^0.9.0"
 pandas = "^2.2.3"
 nvidia-ml-py = "^13.580.82"
+ansible-core = "^2.17.5"
+ansible-runner = "^2.4.0"
 
 [tool.poetry.group.dev.dependencies]
 types-dataclasses = "==0.6.6"
