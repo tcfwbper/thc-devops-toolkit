@@ -106,6 +106,28 @@ class CythonBuilder:
                 init_file.touch()
                 logger.highlight(level=LogLevel.DEBUG, message=f"[CythonBuilder] Created missing __init__.pyx in directory: {dir_}.")
 
+    def _copy_non_python_files(self, temp_src: str | Path) -> None:
+        """Copy non-Python source files to a built directory.
+
+        Args:
+            temp_src (str | Path): Path to the temporary directory.
+        """
+        temp_src = Path(temp_src)
+        built_dir = self._dst / self._src.name
+        for item in temp_src.rglob("*"):
+            if item.is_file():
+                # ignore .py and .pyx files
+                if item.suffix == ".py" or item.suffix == ".pyx":
+                    continue
+
+                rel_path = item.relative_to(temp_src)
+                target_path = built_dir / rel_path
+
+                # copy file to built directory
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(item, target_path)
+                logger.highlight(level=LogLevel.DEBUG, message=f"[CythonBuilder] Copied {item} to built directory as {target_path}.")
+
     def build(self, compiler_directives: dict[str, Any] | None = None) -> None:
         """Build Cython extensions from the source directory.
 
@@ -123,6 +145,7 @@ class CythonBuilder:
             temp_build = Path(temp_dir) / "build"
             self._setup_temp_dir(temp_src=temp_src)
             self._ensure_initializer(temp_src=temp_src)
+            self._copy_non_python_files(temp_src=temp_src)
 
             # collect all .pyx files
             pyx_files: list[str] = [str(file) for file in temp_src.rglob("*") if file.is_file() and file.suffix == ".pyx"]
