@@ -15,16 +15,17 @@
 from pathlib import Path
 
 from thc_devops_toolkit.containerization.docker import docker_pull
-from thc_devops_toolkit.security.trivy.trivy import trivy_convert, trivy_scan
+from thc_devops_toolkit.security.trivy.trivy import trivy_convert, trivy_generate_sbom, trivy_scan
 
 cr_host = "docker.io"
 image_name = "busybox"
 image_tag = "latest"
 
-mend_example_dir = Path(__file__).resolve().parent
-json_output_file = mend_example_dir / "trivy_output.json"
-yaml_output_file = mend_example_dir / "trivy_output.yaml"
-html_output_file = mend_example_dir / "trivy_output.html"
+trivy_example_dir = Path(__file__).resolve().parent
+json_output_file = trivy_example_dir / "trivy_output.json"
+yaml_output_file = trivy_example_dir / "trivy_output.yaml"
+html_output_file = trivy_example_dir / "trivy_output.html"
+sbom_output_file = trivy_example_dir / "trivy_sbom.json"
 
 
 def main() -> None:
@@ -44,6 +45,12 @@ def main() -> None:
         input_path=json_output_file,
         output_path=html_output_file,
         template="html",
+    )
+    trivy_generate_sbom(
+        cr_host=cr_host,
+        image_name=image_name,
+        image_tag=image_tag,
+        output_file=sbom_output_file,
     )
 
 

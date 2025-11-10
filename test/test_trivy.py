@@ -134,3 +134,49 @@ def test_trivy_convert_failure():
         tpl_mock.return_value = "@/some/path.tpl"
         with pytest.raises(RuntimeError):
             trivy_mod.trivy_convert("in.json", "out.txt", "tpl")
+
+def test_trivy_generate_sbom_success(tmp_path):
+    with patch("subprocess.run") as run_mock:
+        run_mock.return_value.returncode = 0
+        cr_host = "host"
+        image_name = "busybox"
+        image_tag = "latest"
+        output_file = tmp_path / "out"
+        trivy_mod.trivy_generate_sbom(
+            cr_host=cr_host,
+            image_name=image_name,
+            image_tag=image_tag,
+            output_file=output_file
+        )
+        run_mock.assert_called_once()
+        args = run_mock.call_args[0][0]
+        assert args == [
+            "trivy",
+            "image",
+            "--timeout",
+            "60m",
+            "--format",
+            "cyclonedx",
+            "-o",
+            str(output_file.with_suffix(".json")),
+            f"{cr_host}/{image_name}:{image_tag}"
+        ]
+
+def test_trivy_generate_sbom_failure(tmp_path):
+    with patch("subprocess.run") as run_mock:
+        proc = MagicMock()
+        cr_host = "host"
+        image_name = "busybox"
+        image_tag = "latest"
+        output_file = tmp_path / "out"
+        proc.returncode = 1
+        proc.stderr = b"fail"
+        run_mock.return_value = proc
+        with pytest.raises(RuntimeError):
+            trivy_mod.trivy_generate_sbom(
+                cr_host=cr_host,
+                image_name=image_name,
+                image_tag=image_tag,
+                output_file=output_file
+            )
+ 

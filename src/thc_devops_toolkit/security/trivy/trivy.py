@@ -95,3 +95,27 @@ def trivy_convert(input_path: str | Path, output_path: str | Path, template: str
         level=LogLevel.INFO,
         message=f"Trivy conversion completed: {output_path}",
     )
+
+
+def trivy_generate_sbom(cr_host: str, image_name: str, image_tag: str, output_file: str | Path) -> None:
+    """Generate a Software Bill of Materials (SBOM) for a container image using Trivy.
+
+    Args:
+        cr_host (str): The container registry host.
+        image_name (str): The name of the image.
+        image_tag (str): The tag of the image.
+        output_file (str | Path): The output file path.
+
+    Raises:
+        RuntimeError: If the Trivy CLI fails.
+    """
+    full_image_name = f"{cr_host}/{image_name}:{image_tag}"
+    output_file = str(Path(output_file).with_suffix(".json"))
+    cmd = ["trivy", "image", "--timeout", "60m", "--format", "cyclonedx", "-o", output_file, full_image_name]
+    process = subprocess.run(cmd, capture_output=True, check=False)
+    if process.returncode != 0:
+        raise RuntimeError(f"Failed to scan image: {full_image_name} (exit code: {process.returncode}){str(process.stderr, 'UTF-8')}")
+    logger.highlight(
+        level=LogLevel.INFO,
+        message=f"Trivy SBOM generation completed for image: {full_image_name}",
+    )
