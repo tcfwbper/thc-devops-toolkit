@@ -77,8 +77,13 @@ class TestPlaybook:
             mandatory_vars={"required_var", "another_required_var"}
         )
         
-        with pytest.raises(ValueError, match="Missing mandatory extravars: required_var, another_required_var"):
+        with pytest.raises(ValueError) as exc_info:
             playbook.verify_extravars()
+        
+        error_message = str(exc_info.value)
+        assert "Missing mandatory extravars:" in error_message
+        assert "required_var" in error_message
+        assert "another_required_var" in error_message
 
     def test_override_vars(self):
         """Test variable override functionality."""

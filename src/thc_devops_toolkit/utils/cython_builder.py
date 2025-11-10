@@ -117,7 +117,7 @@ class CythonBuilder:
         for item in temp_src.rglob("*"):
             if item.is_file():
                 # ignore .py and .pyx files
-                if item.suffix == ".py" or item.suffix == ".pyx":
+                if item.suffix in [".py", ".pyx"]:
                     continue
 
                 rel_path = item.relative_to(temp_src)
