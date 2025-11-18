@@ -31,7 +31,7 @@ Tsung-Han Chang
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Git example script")
+    parser = argparse.ArgumentParser(description="Test EMailSender with Gmail")
     parser.add_argument("--gmail", required=True, help="Gmail address")
     args = parser.parse_args()
 
