@@ -12,110 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""This module provides utility functions and classes for manipulating Markdown documents and tables.
-
-Includes MarkdownDocumentManager for managing tables in markdown files, and MarkdownTable for table operations.
-"""
+"""This module provides utility functions and classes for manipulating Markdown documents and dataframes."""
 
 import re
-import uuid
-from collections.abc import Hashable
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 import pandas as pd
 
 from thc_devops_toolkit.observability import LogLevel, logger
 
-_markdown_comment_head: str = "<!--"
-_markdown_comment_tail: str = "-->"
-_markdown_table_marker: str = "MarkdownDocumentManager:Table"
-_markdown_table_id_argument: str = "table_id="
-
-
-def get_empty_dataframe(header: list[Hashable]) -> pd.DataFrame:
-    """Creates an empty DataFrame with the specified header.
-
-    Args:
-        header (list[Hashable]): List of column names.
-
-    Returns:
-        pd.DataFrame: An empty DataFrame with the given columns.
-    """
-    logger.debug("Creating empty table with header: %s", header)
-    return pd.DataFrame(columns=header)
-
-
-def match_mask(dataframe: pd.DataFrame, column: Hashable, match_value: Any) -> pd.Series:
-    """Returns a boolean mask for rows where column matches match_value.
-
-    Args:
-        dataframe (pd.DataFrame): The DataFrame to search.
-        column (Hashable): The column to match.
-        match_value (Any): The value to match.
-
-    Returns:
-        pd.Series[bool]: Boolean mask for matching rows.
-    """
-    logger.debug("Matching mask for column '%s' with value '%s'", column, match_value)
-    condition = pd.Series([True] * len(dataframe))
-    condition &= dataframe[column] == match_value
-    return condition
-
-
-@dataclass
-class MarkdownTable:
-    """Represents a markdown table with a unique table_id and DataFrame.
-
-    Attributes:
-        table_id (str): Unique identifier for the table.
-        dataframe (pd.DataFrame | None): The table data.
-    """
-
-    # please ensure table_id is unique in a markdown document
-    table_id: str = ""
-    dataframe: pd.DataFrame | None = None
-
-    def upsert_row(self, data: dict[Hashable, Any], primary_key: str, insert_ahead: bool = False) -> None:
-        """Upserts a row into the table by primary key.
-
-        Args:
-            data (dict[Hashable, Any]): Row data to insert or update.
-            primary_key (str): The primary key column.
-            insert_ahead (bool, optional): Insert at the top if True. Defaults to False.
-        """
-        logger.info("Upserting row with primary_key %s: %s", primary_key, data)
-        # Ensure dataframe is initialized
-        if self.dataframe is None:
-            self.dataframe = get_empty_dataframe(list(data.keys()))
-        # check primary key
-        condition = match_mask(dataframe=self.dataframe, column=primary_key, match_value=data[primary_key])
-        if condition.any():
-            # hit
-            logger.info("Updating existing row with primary_key %s", primary_key)
-            row_idx = self.dataframe[condition].index[0]
-            for key, value in data.items():
-                # skip?
-                if value is not None:
-                    self.dataframe.at[row_idx, key] = value
-        else:
-            # new data
-            logger.info("Inserting new row")
-            if insert_ahead:
-                new_df = pd.DataFrame([data])
-                self.dataframe = pd.concat([new_df, self.dataframe], ignore_index=True)
-            else:
-                self.dataframe.loc[len(self.dataframe)] = data
+_comment_head: str = "<!--"
+_comment_tail: str = "-->"
+_dataframe_marker: str = "MarkdownDocumentManager:DataFrame"
+_dataframe_id_argument: str = "dataframe_id="
+_dataframe_marker_pattern = rf"^{_comment_head}{_dataframe_marker}\s+{_dataframe_id_argument}(.*?){_comment_tail}$"
 
 
 class MarkdownDocumentManager:
-    """Manages a markdown document, supporting table parsing, insertion, and saving.
+    """Manages a markdown document, supporting dataframe parsing, insertion, and saving.
 
     Attributes:
         file_path (Path): Path to the markdown file.
-        lines (list[str | MarkdownTable]): Document lines and tables.
-        tables (dict[str, MarkdownTable]): Table id to MarkdownTable mapping.
+        lines (list[str | pd.DataFrame]): Document lines and dataframes.
+        _dataframes (dict[str, pd.DataFrame]): DataFrame id to pd.DataFrame mapping.
     """
 
     def __init__(self, file_path: str | Path):
@@ -126,228 +45,188 @@ class MarkdownDocumentManager:
         """
         logger.info("Initializing MarkdownDocumentManager for file: %s", file_path)
         self.file_path: Path = Path(file_path)
-        self.lines: list[str | MarkdownTable] = []
-        self.tables: dict[str, MarkdownTable] = {}
+        self.lines: list[str | pd.DataFrame] = []
+        self._dataframes: dict[str, pd.DataFrame] = {}
         self._load_document()
 
     def _load_document(self) -> None:
-        """Loads the markdown document from file and parses tables."""
+        """Loads the markdown document from file and parses dataframes."""
         logger.info("Loading markdown document from: %s", self.file_path)
+        # read file
         if self.file_path.exists():
             with self.file_path.open("r", encoding="utf-8") as file:
                 self.lines = [line.rstrip() for line in file.readlines()]
         else:
-            logger.highlight(
-                LogLevel.WARNING,
-                f"File does not exist: {self.file_path}",
-            )
+            logger.highlight(LogLevel.WARNING, f"File does not exist: {self.file_path}")
+
         self._parse_lines()
 
     def _parse_lines(self) -> None:
-        """Parses document lines and identifies tables and markers."""
+        """Parses document lines and identifies dataframes and markers."""
         logger.info("Parsing lines in markdown document.")
         # housekeeping
-        self.tables.clear()
+        self._dataframes.clear()
 
         # parse document
-        i: int = 0
-        table_id: str | None = None
+        line_idx: int = 0
 
-        while i < len(self.lines):
-            line_obj = self.lines[i]
-            if isinstance(line_obj, str):
-                line = line_obj.strip()
-            else:
-                # If it's a MarkdownTable, skip marker/table logic
-                table_id = None
-                i += 1
+        while line_idx < len(self.lines):
+            # skip parsed dataframes
+            if isinstance(self.lines[line_idx], pd.DataFrame):
+                line_idx += 1
                 continue
 
-            # is table marker?
-            table_marker_pattern = (
-                rf"^{_markdown_comment_head}{_markdown_table_marker}\s+{_markdown_table_id_argument}(.*?){_markdown_comment_tail}$"
-            )
-            match_ = re.match(table_marker_pattern, line)
+            cur_line = self.lines[line_idx].strip()
+
+            # is managed dataframe?
+            match_ = re.match(_dataframe_marker_pattern, cur_line)
             if match_:
-                table_id = match_.group(1).strip()
-                i += 1
-                continue
+                self._parse_dataframe(start_line=line_idx)
 
-            # is table?
-            # This match table like "| something | else |"
-            if re.match(r"^\s*\|.*\|\s*$", line):
-                logger.debug("Found markdown table at line %d", i)
-                markdown_table = self._parse_table(i)
-                if markdown_table:
-                    # if table_id is not defined, we don't care about this table
-                    # just assign a temporary and random one
-                    if not table_id:
-                        table_id = self._get_tmp_table_id()
-                        logger.highlight(
-                            LogLevel.WARNING,
-                            f"Table without marker found, assigning temporary table_id: {table_id}",
-                        )
-                    markdown_table.table_id = table_id
-                    self.tables[table_id] = markdown_table
-                    table_id = None
-                    i += 1
-                    continue
+            line_idx += 1
 
-            table_id = None  # table_id only works when table is immediately after marker
-            i += 1
-
-    def _parse_table(self, start_line: int) -> MarkdownTable | None:
-        """Parses a markdown table starting at a given line.
+    def _parse_dataframe(self, start_line: int) -> None:
+        """Parses a markdown dataframe starting at a given line, removes parsed lines, and inserts a DataFrame object.
 
         Args:
-            start_line (int): The line index to start parsing.
-
-        Returns:
-            MarkdownTable | None: Parsed table or None if not found.
+            start_line (int): The line index to start parsing. This should point to the dataframe marker line.
         """
-        logger.info("Parsing table starting at line: %d", start_line)
+        logger.info("Parsing dataframe starting at line: %d", start_line)
+
         if start_line >= len(self.lines):
-            logger.highlight(
-                LogLevel.WARNING,
-                f"Start line {start_line} out of range for table parsing.",
-            )
-            return None
+            logger.highlight(LogLevel.ERROR, f"Start line {start_line} out of range for dataframe parsing.")
+            return
 
-        table_lines: list[str] = []
-        i = start_line
+        # extract dataframe id
+        match_ = re.match(_dataframe_marker_pattern, self.lines[start_line])
+        if not match_:
+            logger.highlight(LogLevel.ERROR, f"Line {start_line} is not a valid dataframe marker.")
+            return
+        dataframe_id = str(match_.group(1).strip())
 
-        while i < len(self.lines):
-            line_obj = self.lines[i]
-            if isinstance(line_obj, str) and re.match(r"^\s*\|.*\|\s*$", line_obj):
-                table_lines.append(line_obj.strip())
-                i += 1
+        # parse dataframe lines
+        line_idx = start_line + 1
+        dataframe_lines: list[str] = []
+        while line_idx < len(self.lines):
+            cur_line = self.lines[line_idx]
+            if isinstance(cur_line, str) and re.match(r"^\s*\|.*\|\s*$", cur_line):
+                dataframe_lines.append(cur_line.strip())
+                line_idx += 1
             else:
                 break
 
-        # at least 2 lines for a table (header + separator)
-        if len(table_lines) < 2:
-            logger.highlight(
-                LogLevel.WARNING,
-                f"Table at line {start_line} has less than 2 lines, skipping.",
-            )
-            return None
+        # at least 2 lines for a dataframe (header + separator)
+        if len(dataframe_lines) < 2:
+            logger.highlight(LogLevel.WARNING, f"Dataframe at line {start_line} has less than 2 lines, skipping.")
+            return
 
-        header = [col.strip() for col in table_lines[0].split("|")[1:-1]]
+        header = [col.strip() for col in dataframe_lines[0].split("|")[1:-1]]
 
         data = []
-        for row in table_lines[2:]:  # skip header and separator
+        for row in dataframe_lines[2:]:  # skip header and separator
             cols = [col.strip() for col in row.split("|")[1:-1]]
             if len(cols) == len(header):
-                data_item = {header[j]: cols[j] for j in range(len(header))}
+                data_item = {header[col_idx]: cols[col_idx] for col_idx in range(len(header))}
                 data.append(data_item)
             else:
                 logger.highlight(
                     LogLevel.WARNING,
-                    f"Row in table at line {start_line} has mismatched columns, skipping row: {row}",
+                    f"Row in dataframe at line {start_line} has mismatched columns, skipping row: {row}",
                 )
 
         dataframe = pd.DataFrame(data, columns=header)
 
-        markdown_table = MarkdownTable(table_id="", dataframe=dataframe)
+        # replace lines with DataFrame object
+        del self.lines[start_line:line_idx]
+        self.insert_dataframe(dataframe_id=dataframe_id, line_idx=start_line, dataframe=dataframe)
 
-        # replace lines with table object
-        del self.lines[start_line:i]
-        self.lines.insert(start_line, markdown_table)
-        logger.info("Inserted MarkdownTable object at line: %d", start_line)
-        return markdown_table
+        logger.info("Inserted DataFrame object at line: %d", start_line)
 
-    @staticmethod
-    def _get_tmp_table_id() -> str:
-        """Generates a temporary unique table id.
+    @property
+    def dataframe_ids(self) -> list[str]:
+        """Lists all dataframe ids in the document.
 
         Returns:
-            str: Temporary table id.
+            list[str]: List of dataframe ids.
         """
-        tmp_id = "default-" + str(uuid.uuid4())
-        logger.debug("Generated temporary table_id: %s", tmp_id)
-        return tmp_id
+        return list(self._dataframes.keys())
 
-    def insert_table(self, table: MarkdownTable, line_idx: int) -> None:
-        """Inserts a table at the specified line index.
+    def get_dataframe(self, dataframe_id: str) -> pd.DataFrame | None:
+        """Retrieves a dataframe by its id.
 
         Args:
-            table (MarkdownTable): The table to insert.
-            line_idx (int): The line index to insert at.
-
-        Raises:
-            ValueError: If table id already exists.
-        """
-        logger.info("Inserting table with id '%s' at line %d", table.table_id, line_idx)
-        if table.table_id:
-            table_marker = self.generate_table_marker(table.table_id)
-        else:
-            logger.highlight(
-                LogLevel.WARNING,
-                "Table ID is not defined. Generating a temporary ID.",
-            )
-            table.table_id = self._get_tmp_table_id()
-            table_marker = None
-
-        if table.table_id in self.tables:
-            logger.highlight(
-                LogLevel.ERROR,
-                f"Table with id '{table.table_id}' already exists. Insertion aborted.",
-            )
-            raise ValueError(f"Table with id {table.table_id} already exists")
-
-        if table_marker:
-            self.lines.insert(line_idx, table_marker)
-            line_idx += 1
-        self.lines.insert(line_idx, table)
-        self.tables[table.table_id] = table
-        logger.info("Inserted table with id '%s' at line %d", table.table_id, line_idx)
-
-    def list_tables(self) -> list[str]:
-        """Lists all table ids in the document.
+            dataframe_id (str): The id of the dataframe to retrieve.
 
         Returns:
-            list[str]: List of table ids.
+            pd.DataFrame | None: The requested DataFrame, or None if not found.
         """
-        return list(self.tables.keys())
+        return self._dataframes.get(dataframe_id, None)
 
-    def save_document(self) -> None:
-        """Saves the current document (including tables) to file."""
+    def insert_dataframe(self, dataframe_id: str, line_idx: int, dataframe: pd.DataFrame) -> None:
+        """Inserts a dataframe marker at the specified line index followed by the dataframe.
+
+        Args:
+            dataframe_id (str): The ID of the dataframe to insert.
+            line_idx (int): The line index to insert at.
+            dataframe (pd.DataFrame): The DataFrame to insert.
+
+        Raises:
+            ValueError: If dataframe id already exists.
+        """
+        if dataframe_id in self._dataframes:
+            logger.highlight(LogLevel.ERROR, f"Dataframe with id '{dataframe_id}' already exists. Insertion aborted.")
+            raise ValueError(f"Dataframe with id {dataframe_id} already exists")
+
+        dataframe_marker = self.generate_dataframe_marker(dataframe_id)
+        self.lines.insert(line_idx, dataframe_marker)
+        line_idx += 1
+
+        self.lines.insert(line_idx, dataframe)
+        self._dataframes[dataframe_id] = dataframe
+        logger.info("DataFrame with id '%s' inserted at line %d", dataframe_id, line_idx)
+
+    @staticmethod
+    def generate_dataframe_marker(dataframe_id: str) -> str:
+        """Generates a dataframe marker comment for a given dataframe id.
+
+        Args:
+            dataframe_id (str): The dataframe id.
+
+        Returns:
+            str: The dataframe marker comment.
+        """
+        logger.debug("Generating dataframe marker for dataframe_id: %s", dataframe_id)
+        return f"{_comment_head}{_dataframe_marker} {_dataframe_id_argument}{dataframe_id}{_comment_tail}"
+
+    def save(self) -> None:
+        """Saves the current document (including dataframes) to file."""
         logger.info("Saving document to: %s", self.file_path)
         # Create a new list to hold the final content
         final_lines: list[str] = []
-        i = 0
+        line_idx = 0
 
-        while i < len(self.lines):
-            # is table?
-            line_obj = self.lines[i]
-            if isinstance(line_obj, MarkdownTable):
-                markdown_table = line_obj
-                if markdown_table.dataframe is not None:
-                    logger.info("Writing table with id %s to file.", markdown_table.table_id)
-                    table_lines = markdown_table.dataframe.to_markdown(index=False).split("\n")
-                    # Remove empty lines at the end
-                    while table_lines and not table_lines[-1].strip():
-                        table_lines.pop()
-                    final_lines.extend(table_lines)
-            elif isinstance(line_obj, str):
+        while line_idx < len(self.lines):
+            cur_line = self.lines[line_idx]
+
+            # is dataframe?
+            if isinstance(cur_line, pd.DataFrame):
+                dataframe_lines = cur_line.sort_index().to_markdown(index=False).split("\n")
+
+                # Remove empty lines at the end
+                while dataframe_lines and not dataframe_lines[-1].strip():
+                    dataframe_lines.pop()
+
+                final_lines.extend(dataframe_lines)
+
+            # is string?
+            elif isinstance(cur_line, str):
                 # Keep original line
-                final_lines.append(line_obj)
-            i += 1
+                final_lines.append(cur_line)
+
+            line_idx += 1
+
         # Write to file
         with self.file_path.open("w", encoding="utf-8") as file:
             for line in final_lines:
                 file.write(line + "\n")
-        logger.info("Document saved successfully to: %s", self.file_path)
-
-    @staticmethod
-    def generate_table_marker(table_id: str) -> str:
-        """Generates a table marker comment for a given table id.
-
-        Args:
-            table_id (str): The table id.
-
-        Returns:
-            str: The table marker comment.
-        """
-        logger.debug("Generating table marker for table_id: %s", table_id)
-        return f"{_markdown_comment_head}{_markdown_table_marker} {_markdown_table_id_argument}{table_id}{_markdown_comment_tail}"
+        logger.info("Document saved to: %s", self.file_path)

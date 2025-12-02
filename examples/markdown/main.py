@@ -12,45 +12,67 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
 
-from thc_devops_toolkit.documentation.markdown import MarkdownDocumentManager, MarkdownTable
+from thc_devops_toolkit.documentation.dataframe import DataFrameRow, upsert_row
+from thc_devops_toolkit.documentation.markdown import MarkdownDocumentManager
 
 md_example_dir = Path(__file__).resolve().parent
 md_file = md_example_dir / "my_file.md"
+dataframe_id = "my_projects"
+
+
+@dataclass
+class MyProjectRow(DataFrameRow):
+    """Data frame row representing a project."""
+
+    project: str
+    owner: str
+    timestamp: str
+    primary_key = "project"
+    _highlightable_fields = frozenset({"timestamp"})
 
 
 def main() -> None:
-    if md_file.exists():
-        md_file.unlink()
-
-    # Read empty document
     doc_manager = MarkdownDocumentManager(md_file)
 
-    # Create MarkdownTable
-    sample_data = [
-        {"Project": "THC-DEVOPS-TOOLKIT", "Owner": "Tsung-Han Chang"},
-        {"Project": "DEVPOD", "Owner": "Pesci Chang"},
-    ]
-    dataframe = pd.DataFrame(sample_data)
-    table = MarkdownTable(table_id="my_projects", dataframe=dataframe)
+    if not md_file.is_file():
+        # Initialize markdown file
+        doc_manager.lines.append("# My Projects")
+        doc_manager.lines.append("")
+        doc_manager.lines.append("## Notes")
+        doc_manager.lines.append("Here are some useful projects.<br>")
+        doc_manager.lines.append("Welcome to pull and contribute.")
+        doc_manager.lines.append("")
 
-    # Update markdown file
-    doc_manager.lines.append("# My Projects")
-    doc_manager.lines.append("")
-    doc_manager.insert_table(table, len(doc_manager.lines))
-    doc_manager.lines.append("")
-    doc_manager.lines.append("## Notes")
-    doc_manager.lines.append("- There are some useful projects.")
-    doc_manager.lines.append("- Welcome to pull and contribute.")
+    # Update dataframe
+    dataframe = doc_manager.get_dataframe(dataframe_id=dataframe_id)
+    if dataframe is None:
+        dataframe = pd.DataFrame(columns=MyProjectRow.header())
+        doc_manager.insert_dataframe(dataframe_id=dataframe_id, line_idx=len(doc_manager.lines), dataframe=dataframe)
 
-    # Update an existing project or insert a new project
-    table.upsert_row(data={"Project": "DEVPOD", "Owner": "Tsung-Han Chang"}, primary_key="Project")
+    this_project = MyProjectRow(
+        project="THC-DEVOPS-TOOLKIT",
+        owner="Tsung-Han Chang",
+        timestamp=datetime.today().strftime("%Y-%m-%d, %H:%M:%S"),
+    )
+    this_project.highlight()
+    upsert_row(dataframe=dataframe, data=this_project)
+
+    devpod = MyProjectRow(
+        project="DEVPOD",
+        owner="Pesci Chang",
+        timestamp=datetime.today().strftime("%Y-%m-%d, %H:%M:%S"),
+    )
+    devpod.highlight()
+    upsert_row(dataframe=dataframe, data=devpod)
 
     # Save the document
-    doc_manager.save_document()
+    doc_manager.save()
 
 
 if __name__ == "__main__":
