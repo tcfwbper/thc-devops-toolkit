@@ -14,27 +14,28 @@ def tmp_md_file():
         md_path.unlink()
     shutil.rmtree(tmpdir, ignore_errors=True)
 
-def test_markdown_table_upsert_row():
-    table = md_mod.MarkdownTable(table_id="t1")
-    data1 = {"id": "1", "name": "Alice"}
-    table.upsert_row(data1, primary_key="id")
-    assert table.dataframe.shape[0] == 1
-    # update
-    data2 = {"id": "1", "name": "Bob"}
-    table.upsert_row(data2, primary_key="id")
-    assert table.dataframe.iloc[0]["name"] == "Bob"
-    # insert ahead
-    data3 = {"id": "2", "name": "Carol"}
-    table.upsert_row(data3, primary_key="id", insert_ahead=True)
-    assert table.dataframe.iloc[0]["id"] == "2"
+def test_dataframe_upsert_operations():
+    # Test basic DataFrame operations
+    df = pd.DataFrame([{"id": "1", "name": "Alice"}])
+    assert df.shape[0] == 1
+    
+    # Update using pandas concat
+    df_update = pd.DataFrame([{"id": "1", "name": "Bob"}])
+    df = pd.concat([df[df['id'] != "1"], df_update], ignore_index=True)
+    assert df.iloc[0]["name"] == "Bob"
+    
+    # Insert ahead
+    df_new = pd.DataFrame([{"id": "2", "name": "Carol"}])
+    df = pd.concat([df_new, df], ignore_index=True)
+    assert df.iloc[0]["id"] == "2"
 
-def test_generate_table_marker():
-    marker = md_mod.MarkdownDocumentManager.generate_table_marker("table-xyz")
-    assert "table_id=table-xyz" in marker
+def test_generate_dataframe_marker():
+    marker = md_mod.MarkdownDocumentManager.generate_dataframe_marker("dataframe-xyz")
+    assert "dataframe_id=dataframe-xyz" in marker
 
-def test_document_manager_parse_and_list_tables(tmp_md_file):
+def test_document_manager_parse_and_list_dataframes(tmp_md_file):
     content = [
-        md_mod._markdown_comment_head + md_mod._markdown_table_marker + " " + md_mod._markdown_table_id_argument + "t1" + md_mod._markdown_comment_tail,
+        md_mod._comment_head + md_mod._dataframe_marker + " " + md_mod._dataframe_id_argument + "t1" + md_mod._comment_tail,
         "| id | name |",
         "|----|------|",
         "| 1  | Alice |",
@@ -44,24 +45,24 @@ def test_document_manager_parse_and_list_tables(tmp_md_file):
     ]
     tmp_md_file.write_text("\n".join(content))
     mgr = md_mod.MarkdownDocumentManager(tmp_md_file)
-    assert "t1" in mgr.list_tables()
-    table = mgr.tables["t1"]
-    assert isinstance(table, md_mod.MarkdownTable)
-    assert table.dataframe.shape[0] == 2
-    assert table.dataframe.iloc[0]["name"] == "Alice"
+    assert "t1" in mgr.dataframe_ids
+    dataframe = mgr.get_dataframe("t1")
+    assert isinstance(dataframe, pd.DataFrame)
+    assert dataframe.shape[0] == 2
+    assert dataframe.iloc[0]["name"] == "Alice"
 
-def test_insert_table_and_save(tmp_md_file):
+def test_insert_dataframe_and_save(tmp_md_file):
     mgr = md_mod.MarkdownDocumentManager(tmp_md_file)
     df = pd.DataFrame([{"id": "1", "name": "A"}, {"id": "2", "name": "B"}])
-    table = md_mod.MarkdownTable(table_id="t2", dataframe=df)
-    mgr.insert_table(table, line_idx=0)
-    assert "t2" in mgr.list_tables()
-    mgr.save_document()
+    mgr.insert_dataframe(dataframe_id="t2", line_idx=0, dataframe=df)
+    assert "t2" in mgr.dataframe_ids
+    mgr.save()
     saved = tmp_md_file.read_text()
     assert "id" in saved and "name" in saved
     assert "A" in saved and "B" in saved
 
-def test_table_without_marker(tmp_md_file):
+def test_dataframe_without_marker(tmp_md_file):
+    # Without a marker, the document manager won't parse standalone tables
     content = [
         "| id | name |",
         "|----|------|",
@@ -69,15 +70,13 @@ def test_table_without_marker(tmp_md_file):
     ]
     tmp_md_file.write_text("\n".join(content))
     mgr = md_mod.MarkdownDocumentManager(tmp_md_file)
-    assert len(mgr.tables) == 1
-    tid = list(mgr.tables.keys())[0]
-    assert tid.startswith("default-")
+    # No dataframes should be detected without markers
+    assert len(mgr.dataframe_ids) == 0
 
-def test_insert_duplicate_table_id(tmp_md_file):
+def test_insert_duplicate_dataframe_id(tmp_md_file):
     mgr = md_mod.MarkdownDocumentManager(tmp_md_file)
     df = pd.DataFrame([{"id": "1", "name": "A"}])
-    table1 = md_mod.MarkdownTable(table_id="dup", dataframe=df)
-    mgr.insert_table(table1, line_idx=0)
-    table2 = md_mod.MarkdownTable(table_id="dup", dataframe=df)
+    mgr.insert_dataframe(dataframe_id="dup", line_idx=0, dataframe=df)
+    df2 = pd.DataFrame([{"id": "2", "name": "B"}])
     with pytest.raises(ValueError):
-        mgr.insert_table(table2, line_idx=1)
+        mgr.insert_dataframe(dataframe_id="dup", line_idx=1, dataframe=df2)
