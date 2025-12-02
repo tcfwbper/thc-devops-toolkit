@@ -154,7 +154,9 @@ def test_add_all_fail(mock_run, git_repo):
 
 # Test commit
 @patch("subprocess.run")
-def test_commit_success(mock_run, git_repo):
+@patch("thc_devops_toolkit.version_control.git.get_exit_code")
+def test_commit_success(mock_get_exit_code, mock_run, git_repo):
+    mock_get_exit_code.return_value = 1  # Simulate there are staged changes
     mock_run.return_value = MagicMock(returncode=0)
     git_repo.local_path = "."
     git_repo.commit(message="test commit")
@@ -162,7 +164,17 @@ def test_commit_success(mock_run, git_repo):
     assert args == ["git", "commit", "-m", "test commit"]
 
 @patch("subprocess.run")
-def test_commit_fail(mock_run, git_repo):
+@patch("thc_devops_toolkit.version_control.git.get_exit_code")
+def test_commit_no_changes(mock_get_exit_code, mock_run, git_repo):
+    mock_get_exit_code.return_value = 0  # Simulate no staged changes
+    git_repo.local_path = "."
+    with pytest.raises(RuntimeError):
+        git_repo.commit(message="test commit")
+
+@patch("subprocess.run")
+@patch("thc_devops_toolkit.version_control.git.get_exit_code")
+def test_commit_fail(mock_get_exit_code, mock_run, git_repo):
+    mock_get_exit_code.return_value = 1  # Simulate there are staged changes
     mock_run.return_value = MagicMock(returncode=1, stderr=b"fail")
     git_repo.local_path = "."
     with pytest.raises(RuntimeError):
