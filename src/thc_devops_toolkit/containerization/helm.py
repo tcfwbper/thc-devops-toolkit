@@ -19,7 +19,6 @@ Functions include login, pull, push, package, verify chart versions/values, and 
 
 import os
 import re
-import subprocess
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -28,6 +27,7 @@ from typing import Any
 from ruamel.yaml import YAML
 
 from thc_devops_toolkit.observability import LogLevel, logger
+from thc_devops_toolkit.utils.subprocess import run_command
 from thc_devops_toolkit.utils.yaml import get_value_from_dict
 
 
@@ -109,13 +109,7 @@ def helm_login(cr_host: str, username: str, password: str) -> None:
     cmd = ["helm", "registry", "login", cr_host, "-u", username, "--password-stdin"]
     env = os.environ.copy()
     env["HELM_EXPERIMENTAL_OCI"] = "1"
-    process = subprocess.run(cmd, input=password.encode("utf-8"), capture_output=True, check=False, env=env)
-    if process.returncode != 0:
-        logger.highlight(
-            level=LogLevel.ERROR,
-            message=f"Failed to login to Helm registry {cr_host} (exit code: {process.returncode})",
-        )
-        raise RuntimeError(f"Failed to login to Helm registry {cr_host} (exit code: {process.returncode})\n{str(process.stderr, 'UTF-8')}")
+    run_command(cmd, input_=password.encode("utf-8"), env=env)
     logger.info("Successfully logged in to Helm registry: %s", cr_host)
 
 
@@ -136,15 +130,7 @@ def helm_pull(remote_chart: str, version: str, untar: bool = False) -> None:
         cmd.append("--untar")
     env = os.environ.copy()
     env["HELM_EXPERIMENTAL_OCI"] = "1"
-    process = subprocess.run(cmd, capture_output=True, check=False, env=env)
-    if process.returncode != 0:
-        logger.highlight(
-            level=LogLevel.ERROR,
-            message=f"Failed to pull '{remote_chart}' with version {version} (exit code: {process.returncode})",
-        )
-        raise RuntimeError(
-            f"Failed to pull '{remote_chart}' with version {version} (exit code: {process.returncode})\n{str(process.stderr, 'UTF-8')}"
-        )
+    run_command(cmd, env=env)
     logger.info("Successfully pulled Helm chart: %s", remote_chart)
 
 
@@ -162,15 +148,7 @@ def helm_package(chart: Chart) -> None:
     cmd = ["helm", "package", chart_path]
     env = os.environ.copy()
     env["HELM_EXPERIMENTAL_OCI"] = "1"
-    process = subprocess.run(cmd, capture_output=True, check=False, env=env)
-    if process.returncode != 0:
-        logger.highlight(
-            level=LogLevel.ERROR,
-            message=f"Failed to package Helm chart at path '{chart_path}' (exit code: {process.returncode})",
-        )
-        raise RuntimeError(
-            f"Failed to package Helm chart on path '{chart_path}' (exit code: {process.returncode})\n{str(process.stderr, 'UTF-8')}"
-        )
+    run_command(cmd, env=env)
     logger.info("Successfully packaged Helm chart: %s", chart.name)
 
 
@@ -189,15 +167,7 @@ def helm_push(chart: Chart, repository: str) -> None:
     cmd = ["helm", "push", tgz_file, repository]
     env = os.environ.copy()
     env["HELM_EXPERIMENTAL_OCI"] = "1"
-    process = subprocess.run(cmd, capture_output=True, check=False, env=env)
-    if process.returncode != 0:
-        logger.highlight(
-            level=LogLevel.ERROR,
-            message=f"Failed to push '{tgz_file}' to '{repository}' (exit code: {process.returncode})\n{str(process.stderr, 'UTF-8')}",
-        )
-        raise RuntimeError(
-            f"Failed to push '{tgz_file}' to '{repository}' (exit code: {process.returncode})\n{str(process.stderr, 'UTF-8')}"
-        )
+    run_command(cmd, env=env)
     logger.info("Successfully pushed Helm chart: %s", tgz_file)
 
 

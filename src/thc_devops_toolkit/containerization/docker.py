@@ -19,12 +19,12 @@ Functions include login, pull, push, build, tag, run, stop, remove, copy, exec, 
 
 import json
 import re
-import subprocess
 import time
 from collections import deque
 from typing import Any
 
 from thc_devops_toolkit.observability import LogLevel, logger
+from thc_devops_toolkit.utils.subprocess import run_command
 
 
 def docker_login(cr_host: str, username: str, password: str) -> None:
@@ -41,15 +41,7 @@ def docker_login(cr_host: str, username: str, password: str) -> None:
     logger.info("Logging in to Docker registry: %s with user: %s", cr_host, username)
     password = re.sub(r"\x1b\[[0-9;]*[A-Za-z~]", "", password)  # Clean ANSI escape codes
     cmd = ["docker", "login", cr_host, "-u", username, "--password-stdin"]
-    process = subprocess.run(cmd, input=password.encode("utf-8"), capture_output=True, check=False)
-    if process.returncode != 0:
-        logger.highlight(
-            level=LogLevel.ERROR,
-            message=f"Failed to login to Docker registry {cr_host}: {process.stderr.decode('utf-8')}",
-        )
-        raise RuntimeError(
-            f"Failed to login to Docker registry {cr_host} (exit code: {process.returncode})\n{process.stderr.decode('utf-8')}"
-        )
+    run_command(cmd, input_=password.encode("utf-8"))
     logger.info("Successfully logged in to Docker registry: %s", cr_host)
 
 
@@ -64,14 +56,7 @@ def docker_pull(full_image_name: str) -> None:
     """
     logger.info("Pulling Docker image: %s", full_image_name)
     cmd = ["docker", "pull", full_image_name]
-    process = subprocess.run(cmd, capture_output=True, check=False)
-    if process.returncode != 0:
-        stderr = process.stderr.decode("utf-8") if process.stderr else ""
-        logger.highlight(
-            level=LogLevel.ERROR,
-            message=f"Failed to pull image: {full_image_name} (exit code: {process.returncode})",
-        )
-        raise RuntimeError(f"Failed to pull image: {full_image_name} (exit code: {process.returncode})\n{stderr}")
+    run_command(cmd)
     logger.info("Successfully pulled Docker image: %s", full_image_name)
 
 
@@ -86,14 +71,7 @@ def docker_push(full_image_name: str) -> None:
     """
     logger.info("Pushing Docker image: %s", full_image_name)
     cmd = ["docker", "push", full_image_name]
-    process = subprocess.run(cmd, capture_output=True, check=False)
-    if process.returncode != 0:
-        stderr = process.stderr.decode("utf-8") if process.stderr else ""
-        logger.highlight(
-            level=LogLevel.ERROR,
-            message=f"Failed to push image: {full_image_name} (exit code: {process.returncode})",
-        )
-        raise RuntimeError(f"Failed to push image: {full_image_name} (exit code: {process.returncode})\n{stderr}")
+    run_command(cmd)
     logger.info("Successfully pushed Docker image: %s", full_image_name)
 
 
@@ -111,14 +89,10 @@ def docker_inspect(target_object: str) -> dict[str, Any]:
     """
     logger.info("Inspecting Docker object: %s", target_object)
     cmd = ["docker", "inspect", target_object]
-    process = subprocess.run(cmd, capture_output=True, check=False)
-    if process.returncode != 0:
-        logger.highlight(
-            level=LogLevel.ERROR,
-            message=f"Failed to inspect: {target_object} (exit code: {process.returncode})",
-        )
-        raise RuntimeError(f"Failed to inspect: {target_object} (exit code: {process.returncode})\n{str(process.stderr, 'UTF-8')}")
-    object_info: dict[str, Any] = json.loads(str(process.stdout, "UTF-8"))[0]
+    stdout = run_command(cmd, capture_output=True)
+    if stdout is None:
+        raise RuntimeError("No output captured from docker inspect command")
+    object_info: dict[str, Any] = json.loads(stdout)[0]
     return object_info
 
 
@@ -145,13 +119,7 @@ def docker_build(
     cmd.extend(["-t", full_image_name])
     cmd.extend(["-f", docker_file_path])
     cmd.append(".")
-    process = subprocess.run(cmd, capture_output=True, check=False)
-    if process.returncode != 0:
-        logger.highlight(
-            level=LogLevel.ERROR,
-            message=f"Failed to build: {full_image_name} (exit code: {process.returncode})",
-        )
-        raise RuntimeError(f"Failed to build: {full_image_name} (exit code: {process.returncode})\n{str(process.stderr, 'UTF-8')}")
+    run_command(cmd)
     logger.info("Successfully built Docker image: %s", full_image_name)
 
 
@@ -170,16 +138,7 @@ def docker_tag(
     """
     logger.info("Tagging Docker image: %s as %s", source_full_image_name, target_full_image_name)
     cmd = ["docker", "tag", source_full_image_name, target_full_image_name]
-    process = subprocess.run(cmd, capture_output=True, check=False)
-    if process.returncode != 0:
-        logger.highlight(
-            level=LogLevel.ERROR,
-            message=f"Failed to tag: {target_full_image_name} from {source_full_image_name} (exit code: {process.returncode})",
-        )
-        raise RuntimeError(
-            f"Failed to tag: {target_full_image_name} from {source_full_image_name} (exit code: {process.returncode})\n"
-            f"{str(process.stderr, 'UTF-8')}"
-        )
+    run_command(cmd)
     logger.info("Successfully tagged Docker image: %s", target_full_image_name)
 
 
@@ -226,14 +185,10 @@ def docker_run_daemon(  # pylint: disable=too-many-arguments
     cmd.append(full_image_name)
     if command:
         cmd.extend(command)
-    process = subprocess.run(cmd, capture_output=True, check=False)
-    if process.returncode != 0:
-        logger.highlight(
-            level=LogLevel.ERROR,
-            message=f"Failed to run image: {full_image_name} (exit code: {process.returncode})",
-        )
-        raise RuntimeError(f"Failed to run image: {full_image_name} (exit code: {process.returncode})\n{str(process.stderr, 'UTF-8')}")
-    container_id = str(process.stdout, "UTF-8").strip()
+    stdout = run_command(cmd, capture_output=True)
+    if stdout is None:
+        raise RuntimeError("No output captured from docker run command")
+    container_id = stdout.strip()
     logger.info("Successfully started container: %s", container_id)
     return container_id
 
@@ -251,13 +206,7 @@ def docker_stop(obj: str, timeout: int = 10, poll_interval: float = 1.0) -> None
     """
     logger.info("Stopping Docker object: %s", obj)
     cmd = ["docker", "stop", obj]
-    process = subprocess.run(cmd, capture_output=True, check=False)
-    if process.returncode != 0:
-        logger.highlight(
-            level=LogLevel.ERROR,
-            message=f"Failed to stop: {obj} (exit code: {process.returncode})",
-        )
-        raise RuntimeError(f"Failed to stop: {obj} (exit code: {process.returncode})\n{str(process.stderr, 'UTF-8')}")
+    run_command(cmd)
     # Wait until container is actually stopped
     start = time.time()
     while True:
@@ -293,13 +242,13 @@ def docker_remove(obj: str, ignore_errors: bool = False, timeout: int = 10, poll
     """
     logger.info("Removing Docker container: %s", obj)
     cmd = ["docker", "rm", obj]
-    process = subprocess.run(cmd, capture_output=True, check=False)
-    if process.returncode != 0 and not ignore_errors:
-        logger.highlight(
-            level=LogLevel.ERROR,
-            message=f"Failed to remove: {obj} (exit code: {process.returncode})",
-        )
-        raise RuntimeError(f"Failed to remove: {obj} (exit code: {process.returncode})\n{str(process.stderr, 'UTF-8')}")
+    try:
+        run_command(cmd)
+    except RuntimeError:
+        if not ignore_errors:
+            raise
+        logger.info("Ignoring error while removing Docker container: %s", obj)
+        return
     # Wait until container is actually removed
     start = time.time()
     while True:
@@ -331,13 +280,7 @@ def docker_remove_image(full_image_name: str) -> None:
     """
     logger.info("Removing Docker image: %s", full_image_name)
     cmd = ["docker", "rmi", full_image_name]
-    process = subprocess.run(cmd, capture_output=True, check=False)
-    if process.returncode != 0:
-        logger.highlight(
-            level=LogLevel.ERROR,
-            message=f"Failed to remove image: {full_image_name} (exit code: {process.returncode})",
-        )
-        raise RuntimeError(f"Failed to remove image: {full_image_name} (exit code: {process.returncode})\n{str(process.stderr, 'UTF-8')}")
+    run_command(cmd)
     logger.info("Successfully removed Docker image: %s", full_image_name)
 
 
@@ -353,13 +296,7 @@ def docker_copy(source: str, target: str) -> None:
     """
     logger.info("Copying from %s to %s", source, target)
     cmd = ["docker", "cp", source, target]
-    process = subprocess.run(cmd, capture_output=True, check=False)
-    if process.returncode != 0:
-        logger.highlight(
-            level=LogLevel.ERROR,
-            message=f"Failed to copy {source} to {target} (exit code: {process.returncode})",
-        )
-        raise RuntimeError(f"Failed to copy {source} to {target} (exit code: {process.returncode})\n{str(process.stderr, 'UTF-8')}")
+    run_command(cmd)
     logger.info("Successfully copied from %s to %s", source, target)
 
 
@@ -399,29 +336,18 @@ def docker_exec(
         )
         raise ValueError("Must pass command while docker exec")
     cmd.extend(command)
-    process = subprocess.run(cmd, capture_output=True, check=False)
-    if process.returncode != 0:
-        logger.highlight(
-            level=LogLevel.ERROR,
-            message=f"Failed to exec {command} at {obj}:{workdir} (exit code: {process.returncode})",
-        )
-        raise RuntimeError(
-            f"Failed to exec {command} at {obj}:{workdir} (exit code: {process.returncode})\n{process.stderr.decode('utf-8')}"
-        )
+    stdout = run_command(cmd, capture_output=True)
+
     # print output?
     if print_output:
-        if process.stdout:
-            logger.info("STDOUT from command %s at %s:%s", " ".join(command), obj, workdir)
-            logger.highlight(
-                level=LogLevel.INFO,
-                message=process.stdout.decode("utf-8"),
-            )
-        if process.stderr:
-            logger.info("STDERR from command %s at %s:%s", " ".join(command), obj, workdir)
-            logger.highlight(
-                level=LogLevel.INFO,
-                message=process.stderr.decode("utf-8"),
-            )
+        if stdout is None:
+            raise RuntimeError("No output captured from docker exec command")
+
+        logger.info("STDOUT from command %s at %s:%s", " ".join(command), obj, workdir)
+        logger.highlight(
+            level=LogLevel.INFO,
+            message=stdout,
+        )
 
 
 def get_image_digest(full_image_name: str, precision: int = 6) -> str:

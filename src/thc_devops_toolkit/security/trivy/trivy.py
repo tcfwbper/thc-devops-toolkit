@@ -13,11 +13,11 @@
 # limitations under the License.
 # ==============================================================================
 """A collection of utilities for Trivy security scanning."""
-import subprocess
 from importlib import resources
 from pathlib import Path
 
 from thc_devops_toolkit.observability import LogLevel, logger
+from thc_devops_toolkit.utils.subprocess import run_command
 
 
 def get_trivy_tpl(name: str) -> str:
@@ -55,13 +55,8 @@ def trivy_scan(cr_host: str, image_name: str, image_tag: str, output_file: str |
     full_image_name = f"{cr_host}/{image_name}:{image_tag}"
     output_file = str(Path(output_file).with_suffix(".json"))
     cmd = ["trivy", "image", "--timeout", "60m", "--format", "json", "-o", output_file, full_image_name]
-    process = subprocess.run(cmd, capture_output=True, check=False)
-    if process.returncode != 0:
-        raise RuntimeError(f"Failed to scan image: {full_image_name} (exit code: {process.returncode}){str(process.stderr, 'UTF-8')}")
-    logger.highlight(
-        level=LogLevel.INFO,
-        message=f"Trivy scan completed for image: {full_image_name}",
-    )
+    run_command(cmd)
+    logger.highlight(level=LogLevel.INFO, message=f"Trivy scan completed for image: {full_image_name}")
 
 
 def trivy_convert(input_path: str | Path, output_path: str | Path, template: str | Path) -> None:
@@ -86,15 +81,8 @@ def trivy_convert(input_path: str | Path, output_path: str | Path, template: str
         raise FileNotFoundError(f"Template not found: {template_filename}") from exception
 
     cmd = ["trivy", "convert", "--format", "template", "--template", template_path, "-o", output_path, input_path]
-    process = subprocess.run(cmd, capture_output=True, check=False)
-    if process.returncode != 0:
-        raise RuntimeError(
-            f"Failed to convert trivy template: {input_path} (exit code: {process.returncode}){str(process.stderr, 'UTF-8')}"
-        )
-    logger.highlight(
-        level=LogLevel.INFO,
-        message=f"Trivy conversion completed: {output_path}",
-    )
+    run_command(cmd)
+    logger.highlight(level=LogLevel.INFO, message=f"Trivy conversion completed: {output_path}")
 
 
 def trivy_generate_sbom(cr_host: str, image_name: str, image_tag: str, output_file: str | Path) -> None:
@@ -112,10 +100,5 @@ def trivy_generate_sbom(cr_host: str, image_name: str, image_tag: str, output_fi
     full_image_name = f"{cr_host}/{image_name}:{image_tag}"
     output_file = str(Path(output_file).with_suffix(".json"))
     cmd = ["trivy", "image", "--timeout", "60m", "--format", "cyclonedx", "-o", output_file, full_image_name]
-    process = subprocess.run(cmd, capture_output=True, check=False)
-    if process.returncode != 0:
-        raise RuntimeError(f"Failed to scan image: {full_image_name} (exit code: {process.returncode}){str(process.stderr, 'UTF-8')}")
-    logger.highlight(
-        level=LogLevel.INFO,
-        message=f"Trivy SBOM generation completed for image: {full_image_name}",
-    )
+    run_command(cmd)
+    logger.highlight(level=LogLevel.INFO, message=f"Trivy SBOM generation completed for image: {full_image_name}")

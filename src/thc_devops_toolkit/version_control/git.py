@@ -18,11 +18,11 @@ Functions include cloning, configuring, committing, pushing, pulling, and managi
 """
 
 import re
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
 from thc_devops_toolkit.observability import LogLevel, logger
+from thc_devops_toolkit.utils.subprocess import get_exit_code, run_command
 
 
 @dataclass
@@ -104,32 +104,12 @@ class GitRepo:
             RuntimeError: If setting the config fails.
         """
         logger.info("Setting local git config user.email to %s", self.email)
-
         cmd = ["git", "config", "--local", "user.email", self.email]
-        process = subprocess.run(cmd, cwd=self.local_path, capture_output=True, check=False)
-
-        if process.returncode != 0:
-            logger.highlight(
-                level=LogLevel.ERROR,
-                message=f"Failed to set git config email: {self.email} (exit code: {process.returncode})",
-            )
-            raise RuntimeError(
-                f"Failed to set git config email: {self.email} (exit code: {process.returncode})\n{process.stderr.decode('utf-8')}"
-            )
+        run_command(cmd, cwd=self.local_path)
 
         logger.info("Setting local git config user.name to %s", self.credential.user)
         cmd = ["git", "config", "--local", "user.name", self.credential.user]
-
-        process = subprocess.run(cmd, cwd=self.local_path, capture_output=True, check=False)
-        if process.returncode != 0:
-            logger.highlight(
-                level=LogLevel.ERROR,
-                message=f"Failed to set git config username: {self.credential.user} (exit code: {process.returncode})",
-            )
-            raise RuntimeError(
-                f"Failed to set git config username: {self.credential.user} "
-                f"(exit code: {process.returncode})\n{process.stderr.decode('utf-8')}"
-            )
+        run_command(cmd, cwd=self.local_path)
 
         logger.info("Successfully set local git config for user: %s, email: %s", self.credential.user, self.email)
 
@@ -141,22 +121,11 @@ class GitRepo:
         """
         logger.info("Getting git remotes")
         cmd = ["git", "remote", "-v"]
-        process = subprocess.run(
-            cmd,
-            cwd=self.local_path,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        stdout = run_command(cmd, cwd=self.local_path, capture_output=True, check=False)
+        if stdout is None:
+            raise RuntimeError("Failed to get git remotes: No output received")
 
-        if process.returncode != 0:
-            logger.highlight(
-                level=LogLevel.ERROR,
-                message=f"Failed to get git remotes (exit code: {process.returncode})",
-            )
-            raise RuntimeError(f"Failed to get git remotes (exit code: {process.returncode})\n{process.stderr}")
-
-        for remote_info in process.stdout.strip().splitlines():
+        for remote_info in stdout.splitlines():
             parts = remote_info.split()
             if len(parts) >= 2:
                 name, url = parts[0], parts[1]
@@ -177,14 +146,7 @@ class GitRepo:
             repo_path.mkdir(parents=True)
 
         cmd = ["git", "init"]
-        process = subprocess.run(cmd, cwd=self.local_path, capture_output=True, check=False)
-
-        if process.returncode != 0:
-            logger.highlight(
-                level=LogLevel.ERROR,
-                message=f"Failed to initialize git repo (exit code: {process.returncode})",
-            )
-            raise RuntimeError(f"Failed to initialize git repo (exit code: {process.returncode})")
+        run_command(cmd, cwd=self.local_path)
 
         self._set_config()
         logger.info("Successfully initialized git repo at %s", self.local_path)
@@ -212,14 +174,7 @@ class GitRepo:
         logger.info("Cloning repo from %s on branch %s to %s", masked_pat_format_url, branch, self.local_path)
 
         cmd = ["git", "clone", "-b", branch, pat_format_url, self.local_path]
-        process = subprocess.run(cmd, capture_output=True, check=False)
-
-        if process.returncode != 0:
-            logger.highlight(
-                level=LogLevel.ERROR,
-                message=f"Failed to clone repo (exit code: {process.returncode})",
-            )
-            raise RuntimeError(f"Failed to clone repo (exit code: {process.returncode})")
+        run_command(cmd)
 
         self._set_config()
         self._get_remotes()
@@ -255,14 +210,7 @@ class GitRepo:
         logger.info("Setting git remote url for %s to %s", remote_name, new_url)
 
         cmd = ["git", "remote", "set-url", remote_name, new_url]
-        process = subprocess.run(cmd, cwd=self.local_path, capture_output=True, check=False)
-
-        if process.returncode != 0:
-            logger.highlight(
-                level=LogLevel.ERROR,
-                message=f"Failed to set remote url (exit code: {process.returncode})",
-            )
-            raise RuntimeError(f"Failed to set remote url (exit code: {process.returncode})\n{process.stderr.decode('utf-8')}")
+        run_command(cmd, cwd=self.local_path)
 
         self.remotes[remote_name] = new_url
         logger.info("Successfully set remote url for %s to %s", remote_name, new_url)
@@ -283,14 +231,7 @@ class GitRepo:
         if new_branch:
             cmd.append("-B")
         cmd.append(ref)
-        process = subprocess.run(cmd, cwd=self.local_path, capture_output=True, check=False)
-
-        if process.returncode != 0:
-            logger.highlight(
-                level=LogLevel.ERROR,
-                message=f"Failed to checkout to {ref} (exit code: {process.returncode})",
-            )
-            raise RuntimeError(f"Failed to checkout to {ref} (exit code: {process.returncode})\n{process.stderr.decode('utf-8')}")
+        run_command(cmd, cwd=self.local_path)
 
         logger.info("Successfully checked out ref: %s", ref)
 
@@ -303,14 +244,7 @@ class GitRepo:
         logger.info("Adding all changes to git staging area")
 
         cmd = ["git", "add", "."]
-        process = subprocess.run(cmd, cwd=self.local_path, capture_output=True, check=False)
-
-        if process.returncode != 0:
-            logger.highlight(
-                level=LogLevel.ERROR,
-                message=f"Failed to add changes (exit code: {process.returncode})",
-            )
-            raise RuntimeError(f"Failed to add changes (exit code: {process.returncode})\n{process.stderr.decode('utf-8')}")
+        run_command(cmd, cwd=self.local_path)
 
         logger.info("Successfully added all changes to staging area")
 
@@ -321,19 +255,16 @@ class GitRepo:
             message (str, optional): The commit message (default: "default commit message").
 
         Raises:
-            RuntimeError: If commit fails.
+            RuntimeError: If no changes to commit or commit fails.
         """
         logger.info("Committing with message: %s", message)
 
-        cmd = ["git", "commit", "-m", message]
-        process = subprocess.run(cmd, cwd=self.local_path, capture_output=True, check=False)
+        diff_cmd = ["git", "diff", "--cached", "--quiet"]
+        if get_exit_code(diff_cmd, cwd=self.local_path) == 0:
+            raise RuntimeError("No changes to commit")
 
-        if process.returncode != 0:
-            logger.highlight(
-                level=LogLevel.ERROR,
-                message=f"Failed to commit staged changes (exit code: {process.returncode})",
-            )
-            raise RuntimeError(f"Failed to commit staged changes (exit code: {process.returncode})\n{process.stderr.decode('utf-8')}")
+        commit_cmd = ["git", "commit", "-m", message]
+        run_command(commit_cmd, cwd=self.local_path)
 
         logger.info("Successfully committed changes")
 
@@ -355,14 +286,7 @@ class GitRepo:
             cmd.append("--rebase")
         cmd.append(remote_name)
         cmd.append(branch)
-        process = subprocess.run(cmd, cwd=self.local_path, capture_output=True, check=False)
-
-        if process.returncode != 0:
-            logger.highlight(
-                level=LogLevel.ERROR,
-                message=f"Failed to pull from remote (exit code: {process.returncode})",
-            )
-            raise RuntimeError(f"Failed to pull from remote (exit code: {process.returncode})\n{process.stderr.decode('utf-8')}")
+        run_command(cmd, cwd=self.local_path)
 
         logger.info("Successfully pulled from remote %s branch %s", remote_name, branch)
 
@@ -381,13 +305,6 @@ class GitRepo:
         cmd = ["git", "push"]
         cmd.append(remote_name)
         cmd.append(branch)
-        process = subprocess.run(cmd, cwd=self.local_path, capture_output=True, check=False)
-
-        if process.returncode != 0:
-            logger.highlight(
-                level=LogLevel.ERROR,
-                message=f"Failed to push to remote (exit code: {process.returncode})",
-            )
-            raise RuntimeError(f"Failed to push to remote (exit code: {process.returncode})\n{process.stderr.decode('utf-8')}")
+        run_command(cmd, cwd=self.local_path)
 
         logger.info("Successfully pushed to remote %s branch %s", remote_name, branch)
