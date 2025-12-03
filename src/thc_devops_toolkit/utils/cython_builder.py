@@ -23,8 +23,9 @@ from typing import Any
 from Cython.Build import cythonize
 from setuptools import setup
 
-from thc_devops_toolkit.observability.logger import LogLevel, logger
-from thc_devops_toolkit.utils.timer import timer
+from thc_devops_toolkit.observability import LogLevel, logger
+
+from .time import time_elapsed
 
 
 class CythonBuilder:
@@ -140,7 +141,7 @@ class CythonBuilder:
         self._remove_pycache()
         self._remove_dst()
 
-        with tempfile.TemporaryDirectory(prefix="cython_build_") as temp_dir, timer(topic="Cython Build"):
+        with tempfile.TemporaryDirectory(prefix="cython_build_") as temp_dir, time_elapsed(topic="Cython Build"):
             temp_src = Path(temp_dir) / self._src.name
             temp_build = Path(temp_dir) / "build"
             self._setup_temp_dir(temp_src=temp_src)

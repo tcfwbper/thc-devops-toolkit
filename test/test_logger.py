@@ -1,16 +1,17 @@
 import logging
-import tempfile
 import shutil
+import tempfile
 from io import StringIO
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 from thc_devops_toolkit.observability.logger import (
     ANSIEscapeCode,
-    THCLogger,
     LogLevel,
+    THCLogger,
     ansi_format,
     get_file_handler,
     get_timed_rotating_file_handler,
@@ -136,9 +137,7 @@ class TestFileHandlers:
 
     def test_get_timed_rotating_file_handler_custom(self, tmp_log_file):
         """Test get_timed_rotating_file_handler with custom parameters."""
-        handler = get_timed_rotating_file_handler(
-            str(tmp_log_file), when="H", interval=2, backupCount=10
-        )
+        handler = get_timed_rotating_file_handler(str(tmp_log_file), when="H", interval=2, backupCount=10)
         assert isinstance(handler, TimedRotatingFileHandler)
         assert handler.when == "H"
         assert handler.interval == 7200  # 2 hours in seconds
@@ -172,14 +171,9 @@ class TestTHCLogger:
         """Test THCLogger initialization with custom parameters."""
         custom_formatter = logging.Formatter("%(message)s")
         custom_handlers = [string_handler]
-        
-        logger = THCLogger(
-            name="test_logger",
-            level=logging.INFO,
-            formatter=custom_formatter,
-            handlers=custom_handlers
-        )
-        
+
+        logger = THCLogger(name="test_logger", level=logging.INFO, formatter=custom_formatter, handlers=custom_handlers)
+
         assert logger.name == "test_logger"
         assert logger.level == logging.INFO
         assert logger.formatter == custom_formatter
@@ -188,7 +182,7 @@ class TestTHCLogger:
         """Test highlight method with ERROR level."""
         logger = THCLogger(handlers=[string_handler])
         logger.highlight(LogLevel.ERROR, "error message")
-        
+
         output = string_handler.stream.getvalue()
         assert "error message" in output
         assert "\033[31m" in output  # Red color code
@@ -197,7 +191,7 @@ class TestTHCLogger:
         """Test highlight method with WARNING level."""
         logger = THCLogger(handlers=[string_handler])
         logger.highlight(LogLevel.WARNING, "warning message")
-        
+
         output = string_handler.stream.getvalue()
         assert "warning message" in output
         assert "\033[33m" in output  # Yellow color code
@@ -206,7 +200,7 @@ class TestTHCLogger:
         """Test highlight method with INFO level."""
         logger = THCLogger(handlers=[string_handler])
         logger.highlight(LogLevel.INFO, "info message")
-        
+
         output = string_handler.stream.getvalue()
         assert "info message" in output
         assert "\033[34m" in output  # Blue color code
@@ -215,7 +209,7 @@ class TestTHCLogger:
         """Test highlight method with DEBUG level."""
         logger = THCLogger(handlers=[string_handler])
         logger.highlight(LogLevel.DEBUG, "debug message")
-        
+
         output = string_handler.stream.getvalue()
         assert "debug message" in output
         assert "\033[32m" in output  # Green color code
@@ -224,7 +218,7 @@ class TestTHCLogger:
         """Test highlight method with CRITICAL level."""
         logger = THCLogger(handlers=[string_handler])
         logger.highlight(LogLevel.CRITICAL, "critical message")
-        
+
         output = string_handler.stream.getvalue()
         assert "critical message" in output
         assert "\033[35m" in output  # Magenta color code
@@ -232,13 +226,13 @@ class TestTHCLogger:
     def test_logger_regular_logging_methods(self, string_handler):
         """Test that regular logging methods still work."""
         logger = THCLogger(handlers=[string_handler])
-        
+
         logger.info("regular info")
         logger.error("regular error")
         logger.warning("regular warning")
         logger.debug("regular debug")
         logger.critical("regular critical")
-        
+
         output = string_handler.stream.getvalue()
         assert "regular info" in output
         assert "regular error" in output
@@ -262,13 +256,13 @@ class TestGlobalLogger:
         stream = StringIO()
         test_handler = logging.StreamHandler(stream)
         test_handler.setLevel(logging.DEBUG)
-        test_handler.setFormatter(logging.Formatter('%(message)s'))
-        
+        test_handler.setFormatter(logging.Formatter("%(message)s"))
+
         # Temporarily replace handlers
         original_handlers = logger.handlers.copy()
         logger.handlers.clear()
         logger.addHandler(test_handler)
-        
+
         try:
             logger.info("test message")
             output = stream.getvalue()
@@ -285,13 +279,13 @@ class TestGlobalLogger:
         stream = StringIO()
         test_handler = logging.StreamHandler(stream)
         test_handler.setLevel(logging.DEBUG)
-        test_handler.setFormatter(logging.Formatter('%(message)s'))
-        
+        test_handler.setFormatter(logging.Formatter("%(message)s"))
+
         # Temporarily replace handlers
         original_handlers = logger.handlers.copy()
         logger.handlers.clear()
         logger.addHandler(test_handler)
-        
+
         try:
             logger.highlight(LogLevel.INFO, "highlighted test")
             output = stream.getvalue()

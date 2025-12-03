@@ -15,7 +15,7 @@
 from pathlib import Path
 
 from thc_devops_toolkit.containerization.docker import docker_pull
-from thc_devops_toolkit.security.trivy.trivy import trivy_convert, trivy_generate_sbom, trivy_scan
+from thc_devops_toolkit.security.trivy import trivy_convert, trivy_generate_sbom, trivy_scan
 
 cr_host = "docker.io"
 image_name = "busybox"

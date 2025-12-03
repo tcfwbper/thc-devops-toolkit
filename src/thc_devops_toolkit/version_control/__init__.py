@@ -13,3 +13,17 @@
 # limitations under the License.
 # ==============================================================================
 """A collection of utilities for version control tasks."""
+
+from .dvc import DvcFile, DvcOutput, DvcRepo, DvcTrackedFile, DvcTrackedFiles, merge_dvc_files
+from .git import GitCredential, GitRepo
+
+__all__ = [
+    "DvcOutput",
+    "DvcFile",
+    "DvcTrackedFile",
+    "DvcTrackedFiles",
+    "DvcRepo",
+    "merge_dvc_files",
+    "GitCredential",
+    "GitRepo",
+]

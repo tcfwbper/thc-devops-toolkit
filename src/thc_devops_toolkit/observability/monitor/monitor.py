@@ -21,15 +21,9 @@ from threading import Event, Thread
 import psutil
 import pynvml
 
-from thc_devops_toolkit.observability.logger import LogLevel, logger
-from thc_devops_toolkit.observability.monitor.models import (
-    GPUStatus,
-    NetworkInterface,
-    NetworkInterfaceStatus,
-    ProcessStatus,
-    SystemStatus,
-    Unit,
-)
+from thc_devops_toolkit.observability import LogLevel, logger
+
+from .models import GPUStatus, NetworkInterface, NetworkInterfaceStatus, ProcessStatus, SystemStatus, Unit
 
 
 class Monitor:

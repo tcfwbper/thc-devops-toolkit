@@ -5,7 +5,9 @@ cd "$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"/../
 # Python
 python -m isort src/thc_devops_toolkit
 python -m isort examples
+python -m isort test
 python -m black -q src/thc_devops_toolkit
 python -m black -q examples
+python -m black -q test
 python -m docformatter -i -r src/thc_devops_toolkit
 python -m ruff check --fix src/thc_devops_toolkit

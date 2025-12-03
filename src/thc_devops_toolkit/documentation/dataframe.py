@@ -21,7 +21,7 @@ from typing import Any, ClassVar, TypeVar
 
 import pandas as pd
 
-from .highlight import highlight, unhighlight
+from .text import highlight, unhighlight
 
 DataFrameRowLike = TypeVar("DataFrameRowLike", bound="DataFrameRow")
 

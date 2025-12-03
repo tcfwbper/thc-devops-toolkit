@@ -1,29 +1,35 @@
-import pytest
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
 from typing import Any
+from unittest.mock import MagicMock, Mock, patch
 
-from thc_devops_toolkit.infrastructure.ansible import Playbook
+import pytest
+
+from thc_devops_toolkit.infrastructure import Playbook
 
 
 class TestPlaybook:
     """Test implementation of the Playbook abstract class for testing."""
-    
+
     class ConcretePlaybook(Playbook):
         """Concrete implementation for testing purposes."""
-        
-        def __init__(self, playbook_file: str | Path, inventory_file: str | Path, 
-                     limit: str, extravars: dict[str, Any],
-                     vars_overrides: dict[str, Any] = None,
-                     mandatory_vars: set[str] = None):
+
+        def __init__(
+            self,
+            playbook_file: str | Path,
+            inventory_file: str | Path,
+            limit: str,
+            extravars: dict[str, Any],
+            vars_overrides: dict[str, Any] = None,
+            mandatory_vars: set[str] = None,
+        ):
             super().__init__(playbook_file, inventory_file, limit, extravars)
             self._vars_overrides = vars_overrides or {}
             self._mandatory_vars = mandatory_vars or set()
-        
+
         @property
         def vars_overrides(self) -> dict[str, Any]:
             return self._vars_overrides
-        
+
         @property
         def mandatory_vars(self) -> set[str]:
             return self._mandatory_vars
@@ -31,12 +37,9 @@ class TestPlaybook:
     def test_init(self):
         """Test Playbook initialization."""
         playbook = self.ConcretePlaybook(
-            playbook_file="/path/to/playbook.yml",
-            inventory_file="/path/to/inventory",
-            limit="all",
-            extravars={"var1": "value1"}
+            playbook_file="/path/to/playbook.yml", inventory_file="/path/to/inventory", limit="all", extravars={"var1": "value1"}
         )
-        
+
         assert playbook.playbook_file == "/path/to/playbook.yml"
         assert playbook.inventory_file == "/path/to/inventory"
         assert playbook.limit == "all"
@@ -48,9 +51,9 @@ class TestPlaybook:
             playbook_file=Path("/path/to/playbook.yml"),
             inventory_file=Path("/path/to/inventory"),
             limit="webservers",
-            extravars={"env": "prod"}
+            extravars={"env": "prod"},
         )
-        
+
         assert playbook.playbook_file == "/path/to/playbook.yml"
         assert playbook.inventory_file == "/path/to/inventory"
 
@@ -61,9 +64,9 @@ class TestPlaybook:
             inventory_file="inventory",
             limit="all",
             extravars={"required_var": "value", "optional_var": "value2"},
-            mandatory_vars={"required_var"}
+            mandatory_vars={"required_var"},
         )
-        
+
         # Should not raise any exception
         playbook.verify_extravars()
 
@@ -74,12 +77,12 @@ class TestPlaybook:
             inventory_file="inventory",
             limit="all",
             extravars={"optional_var": "value"},
-            mandatory_vars={"required_var", "another_required_var"}
+            mandatory_vars={"required_var", "another_required_var"},
         )
-        
+
         with pytest.raises(ValueError) as exc_info:
             playbook.verify_extravars()
-        
+
         error_message = str(exc_info.value)
         assert "Missing mandatory extravars:" in error_message
         assert "required_var" in error_message
@@ -92,20 +95,16 @@ class TestPlaybook:
             inventory_file="inventory",
             limit="all",
             extravars={"var1": "original", "var2": "keep"},
-            vars_overrides={"var1": "overridden", "var3": "new"}
+            vars_overrides={"var1": "overridden", "var3": "new"},
         )
-        
+
         playbook.override_vars()
-        
-        expected_extravars = {
-            "var1": "overridden",
-            "var2": "keep", 
-            "var3": "new"
-        }
+
+        expected_extravars = {"var1": "overridden", "var2": "keep", "var3": "new"}
         assert playbook.extravars == expected_extravars
 
-    @patch('thc_devops_toolkit.infrastructure.ansible.ansible_runner.run')
-    @patch('thc_devops_toolkit.infrastructure.ansible.logger')
+    @patch("thc_devops_toolkit.infrastructure.ansible.ansible_runner.run")
+    @patch("thc_devops_toolkit.infrastructure.ansible.logger")
     def test_run_success(self, mock_logger, mock_ansible_run):
         """Test successful playbook execution."""
         # Setup mock
@@ -117,34 +116,31 @@ class TestPlaybook:
             {"stdout": "Task 2 output"},
         ]
         mock_ansible_run.return_value = mock_runner
-        
+
         playbook = self.ConcretePlaybook(
             playbook_file="test.yml",
             inventory_file="inventory",
             limit="all",
             extravars={"var1": "value1"},
             vars_overrides={"override_var": "override_value"},
-            mandatory_vars={"var1"}
+            mandatory_vars={"var1"},
         )
-        
+
         result = playbook.run()
-        
+
         # Verify ansible_runner.run was called with correct parameters
         mock_ansible_run.assert_called_once_with(
-            playbook="test.yml",
-            inventory="inventory",
-            extravars={"var1": "value1", "override_var": "override_value"},
-            limit="all"
+            playbook="test.yml", inventory="inventory", extravars={"var1": "value1", "override_var": "override_value"}, limit="all"
         )
-        
+
         # Verify return value
         assert result == "Task 1 output\nTask 2 output"
-        
+
         # Verify logging
         mock_logger.info.assert_called()
 
-    @patch('thc_devops_toolkit.infrastructure.ansible.ansible_runner.run')
-    @patch('thc_devops_toolkit.infrastructure.ansible.logger')
+    @patch("thc_devops_toolkit.infrastructure.ansible.ansible_runner.run")
+    @patch("thc_devops_toolkit.infrastructure.ansible.logger")
     def test_run_failure(self, mock_logger, mock_ansible_run):
         """Test playbook execution failure."""
         # Setup mock
@@ -154,22 +150,18 @@ class TestPlaybook:
             {"stdout": "Error output"},
         ]
         mock_ansible_run.return_value = mock_runner
-        
+
         playbook = self.ConcretePlaybook(
-            playbook_file="test.yml",
-            inventory_file="inventory",
-            limit="all",
-            extravars={"var1": "value1"},
-            mandatory_vars={"var1"}
+            playbook_file="test.yml", inventory_file="inventory", limit="all", extravars={"var1": "value1"}, mandatory_vars={"var1"}
         )
-        
+
         with pytest.raises(RuntimeError, match="Playbook execution failed: Error output"):
             playbook.run()
-        
+
         # Verify error logging
         mock_logger.highlight.assert_called()
 
-    @patch('thc_devops_toolkit.infrastructure.ansible.ansible_runner.run')
+    @patch("thc_devops_toolkit.infrastructure.ansible.ansible_runner.run")
     def test_run_with_missing_mandatory_vars(self, mock_ansible_run):
         """Test that run fails when mandatory variables are missing."""
         playbook = self.ConcretePlaybook(
@@ -177,16 +169,16 @@ class TestPlaybook:
             inventory_file="inventory",
             limit="all",
             extravars={"optional_var": "value"},
-            mandatory_vars={"required_var"}
+            mandatory_vars={"required_var"},
         )
-        
+
         with pytest.raises(ValueError, match="Missing mandatory extravars: required_var"):
             playbook.run()
-        
+
         # Verify ansible_runner.run was not called
         mock_ansible_run.assert_not_called()
 
-    @patch('thc_devops_toolkit.infrastructure.ansible.ansible_runner.run')
+    @patch("thc_devops_toolkit.infrastructure.ansible.ansible_runner.run")
     def test_run_no_stdout_events(self, mock_ansible_run):
         """Test playbook execution with no stdout events."""
         mock_runner = Mock()
@@ -196,14 +188,9 @@ class TestPlaybook:
             {"event": "playbook_on_task_start"},
         ]
         mock_ansible_run.return_value = mock_runner
-        
-        playbook = self.ConcretePlaybook(
-            playbook_file="test.yml",
-            inventory_file="inventory",
-            limit="all",
-            extravars={}
-        )
-        
+
+        playbook = self.ConcretePlaybook(playbook_file="test.yml", inventory_file="inventory", limit="all", extravars={})
+
         result = playbook.run()
         assert result == ""
 

@@ -18,8 +18,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from thc_devops_toolkit.documentation.dataframe import DataFrameRow, upsert_row
-from thc_devops_toolkit.documentation.markdown import MarkdownDocumentManager
+from thc_devops_toolkit.documentation import DataFrameRow, MarkdownDocumentManager, upsert_row
 
 md_example_dir = Path(__file__).resolve().parent
 md_file = md_example_dir / "my_file.md"

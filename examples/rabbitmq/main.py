@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Iterator
 
 from thc_devops_toolkit.containerization.docker import docker_pull, docker_run_daemon, docker_stop
-from thc_devops_toolkit.infrastructure.rabbitmq import RabbitMQActions, RabbitMQConfig, RabbitMQManager
+from thc_devops_toolkit.infrastructure import RabbitMQActions, RabbitMQConfig, RabbitMQManager
 from thc_devops_toolkit.observability import LogLevel, logger
 
 rabbitmq_example_dir = Path(__file__).resolve().parent
@@ -35,22 +35,23 @@ def run_rabbitmq_server(
     user: str,
     password: str,
 ) -> Iterator[None]:
-    docker_pull(full_image_name=rabbitmq_full_image_name)
-    docker_run_daemon(
-        full_image_name=rabbitmq_full_image_name,
-        remove=True,
-        container_name=rabbitmq_container_name,
-        env_vars=[
-            f"RABBITMQ_DEFAULT_USER={user}",
-            f"RABBITMQ_DEFAULT_PASS={password}",
-        ],
-        port_mappings=[f"{rabbitmq_port}:{rabbitmq_port}"],
-    )
-    time.sleep(10)
+    try:
+        docker_pull(full_image_name=rabbitmq_full_image_name)
+        docker_run_daemon(
+            full_image_name=rabbitmq_full_image_name,
+            remove=True,
+            container_name=rabbitmq_container_name,
+            env_vars=[
+                f"RABBITMQ_DEFAULT_USER={user}",
+                f"RABBITMQ_DEFAULT_PASS={password}",
+            ],
+            port_mappings=[f"{rabbitmq_port}:{rabbitmq_port}"],
+        )
+        time.sleep(10)
 
-    yield
-
-    docker_stop(obj=rabbitmq_container_name)
+        yield
+    finally:
+        docker_stop(obj=rabbitmq_container_name)
 
 
 def rabbitmq_example() -> None:

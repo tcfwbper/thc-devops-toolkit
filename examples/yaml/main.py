@@ -16,7 +16,7 @@ from pathlib import Path
 
 from ruamel.yaml import YAML
 
-from thc_devops_toolkit.utils.yaml import get_value_from_dict, set_value_to_dict
+from thc_devops_toolkit.utils import get_value_from_dict, set_value_to_dict
 
 yaml_example_dir = Path(__file__).resolve().parent
 yaml_file: str = str(yaml_example_dir / "example.yaml")

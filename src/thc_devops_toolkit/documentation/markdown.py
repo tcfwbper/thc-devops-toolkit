@@ -47,11 +47,14 @@ class MarkdownDocumentManager:
         self.file_path: Path = Path(file_path)
         self.lines: list[str | pd.DataFrame] = []
         self._dataframes: dict[str, pd.DataFrame] = {}
-        self._load_document()
+        self.reload()
 
-    def _load_document(self) -> None:
+    def reload(self) -> None:
         """Loads the markdown document from file and parses dataframes."""
         logger.info("Loading markdown document from: %s", self.file_path)
+        # housekeeping
+        self.lines.clear()
+        self._dataframes.clear()
         # read file
         if self.file_path.exists():
             with self.file_path.open("r", encoding="utf-8") as file:
@@ -64,8 +67,6 @@ class MarkdownDocumentManager:
     def _parse_lines(self) -> None:
         """Parses document lines and identifies dataframes and markers."""
         logger.info("Parsing lines in markdown document.")
-        # housekeeping
-        self._dataframes.clear()
 
         # parse document
         line_idx: int = 0

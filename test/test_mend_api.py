@@ -1,7 +1,9 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 import thc_devops_toolkit.security.mend_api_helper as mend
+
 
 def test_get_refresh_token_success():
     with patch("thc_devops_toolkit.security.mend_api_helper.requests.post") as post:
@@ -15,6 +17,7 @@ def test_get_refresh_token_success():
         assert "login" in args[0]
         assert kwargs["headers"]["Content-Type"] == "application/json"
 
+
 def test_get_jwt_token_success():
     with patch("thc_devops_toolkit.security.mend_api_helper.requests.post") as post:
         mock_resp = MagicMock()
@@ -26,6 +29,7 @@ def test_get_jwt_token_success():
         args, kwargs = post.call_args
         assert "accessToken" in args[0]
         assert kwargs["headers"]["wss-refresh-token"] == "REFRESH"
+
 
 def test_get_alerts_by_library_success():
     with patch("thc_devops_toolkit.security.mend_api_helper.requests.get") as get:
@@ -40,6 +44,7 @@ def test_get_alerts_by_library_success():
         assert "groupBy/component" in args[0]
         assert kwargs["headers"]["Authorization"].startswith("Bearer ")
 
+
 def test_get_alerts_by_library_type_error():
     with patch("thc_devops_toolkit.security.mend_api_helper.requests.get") as get:
         mock_resp = MagicMock()
@@ -47,6 +52,7 @@ def test_get_alerts_by_library_type_error():
         get.return_value = mock_resp
         with pytest.raises(ValueError):
             mend.get_alerts_by_library("projtoken", "jwt")
+
 
 def test_get_vulnerabilities_by_project_success():
     with patch("thc_devops_toolkit.security.mend_api_helper.requests.get") as get:
@@ -60,6 +66,7 @@ def test_get_vulnerabilities_by_project_success():
         args, kwargs = get.call_args
         assert "alerts/security" in args[0]
         assert kwargs["headers"]["Authorization"].startswith("Bearer ")
+
 
 def test_get_vulnerabilities_by_project_type_error():
     with patch("thc_devops_toolkit.security.mend_api_helper.requests.get") as get:

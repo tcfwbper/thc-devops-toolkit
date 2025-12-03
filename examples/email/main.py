@@ -17,7 +17,7 @@ import getpass
 import smtplib
 
 from thc_devops_toolkit.observability import LogLevel, logger
-from thc_devops_toolkit.utils.notification import EMailSender
+from thc_devops_toolkit.utils import EMailSender
 
 google_smtp_server = "smtp.gmail.com"
 google_smtp_port = 587

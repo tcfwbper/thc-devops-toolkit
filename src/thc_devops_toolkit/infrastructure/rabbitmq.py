@@ -22,7 +22,6 @@ from threading import Event, Thread
 from typing import Any
 
 import pika
-from pika.adapters.blocking_connection import BlockingChannel
 
 from thc_devops_toolkit.observability import LogLevel, logger
 
@@ -48,7 +47,7 @@ class RabbitMQConfig:  # pylint: disable=too-many-instance-attributes
         routing_key (str): RabbitMQ routing key.
         tls (bool): Whether to use TLS.
         message_queue (Queue): Queue for message passing or receiving.
-        channel (BlockingChannel | None): RabbitMQ channel.
+        connection (pika.BlockingConnection | None): RabbitMQ connection.
     """
 
     host: str
@@ -60,7 +59,7 @@ class RabbitMQConfig:  # pylint: disable=too-many-instance-attributes
     routing_key: str
     tls: bool
     message_queue: Queue[bytes] = field(default_factory=Queue, init=False, repr=False)
-    channel: BlockingChannel | None = field(default=None, init=False, repr=False)
+    connection: pika.BlockingConnection | None = field(default=None, init=False, repr=False)
 
 
 class RabbitMQManager:  # pylint: disable=too-many-instance-attributes
@@ -205,8 +204,8 @@ class RabbitMQManager:  # pylint: disable=too-many-instance-attributes
                     password=config.password,
                     tls=config.tls,
                 )
+                config.connection = connection
                 channel = connection.channel()
-                config.channel = channel
                 channel.exchange_declare(exchange=config.exchange_name, exchange_type=config.exchange_type)
                 result = channel.queue_declare("", exclusive=True)
                 queue_name = result.method.queue
@@ -226,6 +225,9 @@ class RabbitMQManager:  # pylint: disable=too-many-instance-attributes
                     message=f"[RabbitMQ] Error occurred: {exception}",
                 )
                 time.sleep(10)
+            finally:
+                if config.connection is not None and config.connection.is_open:
+                    config.connection.close()
 
     def send(self, config: RabbitMQConfig) -> None:
         """Sends messages from the queue to RabbitMQ.
@@ -244,6 +246,7 @@ class RabbitMQManager:  # pylint: disable=too-many-instance-attributes
                     password=config.password,
                     tls=config.tls,
                 )
+                config.connection = connection
                 channel = connection.channel()
                 channel.exchange_declare(exchange=config.exchange_name, exchange_type=config.exchange_type)
                 channel.basic_publish(exchange=config.exchange_name, routing_key=config.routing_key, body=data)
@@ -253,6 +256,7 @@ class RabbitMQManager:  # pylint: disable=too-many-instance-attributes
                     config.routing_key,
                 )
                 connection.close()
+                config.connection = None
             except Empty:
                 continue
             except Exception as exception:  # pylint: disable=broad-except
@@ -266,6 +270,25 @@ class RabbitMQManager:  # pylint: disable=too-many-instance-attributes
                 time.sleep(10)
                 if "data" in locals():
                     config.message_queue.put(data)
+            finally:
+                if config.connection is not None and config.connection.is_open:
+                    config.connection.close()
+
+    @staticmethod
+    def _stop_receiver(connection: pika.BlockingConnection) -> None:
+        """Stops a RabbitMQ receiver by closing its connection.
+
+        Args:
+            connection (pika.BlockingConnection): RabbitMQ connection.
+        """
+
+        # callback function
+        def _on_close_connection() -> None:
+            """Callback for closing connection."""
+            if connection.is_open:
+                connection.close()
+
+        connection.add_callback_threadsafe(_on_close_connection)
 
     def shutdown(self) -> None:
         """Gracefully shuts down the RabbitMQ manager and all threads."""
@@ -274,8 +297,8 @@ class RabbitMQManager:  # pylint: disable=too-many-instance-attributes
 
         # Close all channels
         for receiver_config in self.receivers.values():
-            if receiver_config.channel is not None:
-                receiver_config.channel.stop_consuming()
+            if receiver_config.connection is not None:
+                self._stop_receiver(receiver_config.connection)
 
         # Wait for all threads to finish with a reasonable timeout
         for thread in self.threads:

@@ -13,3 +13,11 @@
 # limitations under the License.
 # ==============================================================================
 """A collection of utilities for trivy tasks."""
+
+from .trivy import trivy_convert, trivy_generate_sbom, trivy_scan
+
+__all__ = [
+    "trivy_scan",
+    "trivy_convert",
+    "trivy_generate_sbom",
+]
