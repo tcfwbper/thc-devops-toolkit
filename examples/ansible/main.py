@@ -17,7 +17,7 @@ import getpass
 from pathlib import Path
 from typing import Any
 
-from thc_devops_toolkit.infrastructure.ansible import Playbook
+from thc_devops_toolkit.infrastructure import Playbook
 
 ansible_example_dir = Path(__file__).resolve().parent
 playbook_file = ansible_example_dir / "helloworld.yml"

@@ -1,12 +1,10 @@
 from dataclasses import dataclass
 from typing import ClassVar
+
 import pandas as pd
 import pytest
-from thc_devops_toolkit.documentation.dataframe import (
-    DataFrameRow,
-    row_matches,
-    upsert_row,
-)
+
+from thc_devops_toolkit.documentation import DataFrameRow, row_matches, upsert_row
 
 
 @dataclass
@@ -76,20 +74,24 @@ def test_dataframe_row_highlight_no_highlightable_fields():
 
 
 def test_row_matches_found():
-    df = pd.DataFrame([
-        {"id": "1", "name": "Alice"},
-        {"id": "2", "name": "Bob"},
-    ])
+    df = pd.DataFrame(
+        [
+            {"id": "1", "name": "Alice"},
+            {"id": "2", "name": "Bob"},
+        ]
+    )
     result = row_matches(df, "id", "1")
     assert result.iloc[0] == True
     assert result.iloc[1] == False
 
 
 def test_row_matches_not_found():
-    df = pd.DataFrame([
-        {"id": "1", "name": "Alice"},
-        {"id": "2", "name": "Bob"},
-    ])
+    df = pd.DataFrame(
+        [
+            {"id": "1", "name": "Alice"},
+            {"id": "2", "name": "Bob"},
+        ]
+    )
     result = row_matches(df, "id", "3")
     assert not result.any()
 

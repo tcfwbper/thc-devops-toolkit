@@ -15,8 +15,8 @@
 import shutil
 from pathlib import Path
 
-from thc_devops_toolkit.utils.cython_builder import CythonBuilder
-from thc_devops_toolkit.version_control.git import GitCredential, GitRepo
+from thc_devops_toolkit.utils import CythonBuilder
+from thc_devops_toolkit.version_control import GitCredential, GitRepo
 
 cython_builder_example_dir = Path(__file__).resolve().parent
 repo_url = "https://github.com/psf/requests"

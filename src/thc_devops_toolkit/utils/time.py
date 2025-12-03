@@ -18,11 +18,11 @@ import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-from thc_devops_toolkit.observability.logger import LogLevel, logger
+from thc_devops_toolkit.observability import LogLevel, logger
 
 
 @contextmanager
-def timer(topic: str) -> Iterator[None]:
+def time_elapsed(topic: str) -> Iterator[None]:
     """Context manager to measure and log the execution time of a code block.
 
     Args:

@@ -15,8 +15,7 @@
 import shutil
 from pathlib import Path
 
-from thc_devops_toolkit.version_control.dvc import DvcRepo
-from thc_devops_toolkit.version_control.git import GitCredential, GitRepo
+from thc_devops_toolkit.version_control import DvcRepo, GitCredential, GitRepo
 
 dvc_example_dir = Path(__file__).resolve().parent
 remote_name = "my_remote"

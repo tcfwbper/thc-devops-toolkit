@@ -24,7 +24,7 @@ from collections import deque
 from typing import Any
 
 from thc_devops_toolkit.observability import LogLevel, logger
-from thc_devops_toolkit.utils.subprocess import run_command
+from thc_devops_toolkit.utils import run_command
 
 
 def docker_login(cr_host: str, username: str, password: str) -> None:

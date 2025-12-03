@@ -9,11 +9,13 @@ echo "- Start Python checks"
 echo "- isort: start"
 python -m isort --check-only src/thc_devops_toolkit
 python -m isort --check-only examples
+python -m isort --check-only test
 echo "- isort: done"
 
 echo "- black: start"
 python -m black --check src/thc_devops_toolkit
 python -m black --check examples
+python -m black --check test
 echo "- black: done"
 
 echo "- docformatter: start"

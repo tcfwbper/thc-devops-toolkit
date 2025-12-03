@@ -17,7 +17,7 @@ from importlib import resources
 from pathlib import Path
 
 from thc_devops_toolkit.observability import LogLevel, logger
-from thc_devops_toolkit.utils.subprocess import run_command
+from thc_devops_toolkit.utils import run_command
 
 
 def get_trivy_tpl(name: str) -> str:

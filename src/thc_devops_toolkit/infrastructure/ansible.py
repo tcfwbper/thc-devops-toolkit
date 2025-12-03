@@ -20,7 +20,7 @@ from typing import Any
 
 import ansible_runner
 
-from thc_devops_toolkit.observability.logger import LogLevel, logger
+from thc_devops_toolkit.observability import LogLevel, logger
 
 
 class Playbook(ABC):

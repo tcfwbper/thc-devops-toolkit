@@ -18,7 +18,7 @@ import shutil
 from pathlib import Path
 
 from thc_devops_toolkit.observability import LogLevel, logger
-from thc_devops_toolkit.version_control.git import GitCredential, GitRepo
+from thc_devops_toolkit.version_control import GitCredential, GitRepo
 
 repo_url = "https://github.com/tcfwbper/devpod.git"
 repo_dir = "devpod"

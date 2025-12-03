@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Iterator
 
 from thc_devops_toolkit.containerization.docker import docker_pull, docker_run_daemon, docker_stop
-from thc_devops_toolkit.infrastructure.minio import get_minio_service, minio_makedir, minio_removedir, mirror_dir_to_bucket
+from thc_devops_toolkit.infrastructure import get_minio_service, minio_makedir, minio_removedir, mirror_dir_to_bucket
 from thc_devops_toolkit.observability import logger
 
 minio_example_dir = Path(__file__).resolve().parent

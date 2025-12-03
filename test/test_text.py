@@ -1,4 +1,4 @@
-from thc_devops_toolkit.documentation.highlight import highlight, unhighlight
+from thc_devops_toolkit.documentation import highlight, unhighlight
 
 
 def test_highlight_normal_text():
