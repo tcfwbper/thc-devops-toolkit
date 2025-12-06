@@ -16,7 +16,7 @@
 
 from .cython_builder import CythonBuilder
 from .notification import EMailSender
-from .subprocess import get_exit_code, run_command
+from .subprocess import CalledProcessError, SubprocessResult, run_command
 from .time import time_elapsed
 from .yaml import get_value_from_dict, parse_key_path, set_value_to_dict
 
@@ -24,7 +24,8 @@ __all__ = [
     "CythonBuilder",
     "EMailSender",
     "run_command",
-    "get_exit_code",
+    "SubprocessResult",
+    "CalledProcessError",
     "time_elapsed",
     "parse_key_path",
     "get_value_from_dict",

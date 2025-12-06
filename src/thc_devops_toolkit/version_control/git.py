@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from thc_devops_toolkit.observability import LogLevel, logger
-from thc_devops_toolkit.utils.subprocess import get_exit_code, run_command
+from thc_devops_toolkit.utils import run_command
 
 
 @dataclass
@@ -105,11 +105,15 @@ class GitRepo:
         """
         logger.info("Setting local git config user.email to %s", self.email)
         cmd = ["git", "config", "--local", "user.email", self.email]
-        run_command(cmd, cwd=self.local_path)
+        result = run_command(cmd, cwd=self.local_path, log_on_errors=False, raise_on_errors=False)
+        if result.returncode != 0:
+            raise RuntimeError(f"Failed to set git user.email to {self.email}.")
 
         logger.info("Setting local git config user.name to %s", self.credential.user)
         cmd = ["git", "config", "--local", "user.name", self.credential.user]
-        run_command(cmd, cwd=self.local_path)
+        result = run_command(cmd, cwd=self.local_path, log_on_errors=False, raise_on_errors=False)
+        if result.returncode != 0:
+            raise RuntimeError(f"Failed to set git user.name to {self.credential.user}.")
 
         logger.info("Successfully set local git config for user: %s, email: %s", self.credential.user, self.email)
 
@@ -121,11 +125,11 @@ class GitRepo:
         """
         logger.info("Getting git remotes")
         cmd = ["git", "remote", "-v"]
-        stdout = run_command(cmd, cwd=self.local_path, capture_output=True, check=False)
-        if stdout is None:
-            raise RuntimeError("Failed to get git remotes: No output received")
+        result = run_command(cmd, cwd=self.local_path, capture_output=True, log_on_errors=False, raise_on_errors=False)
+        if result.returncode != 0:
+            raise RuntimeError("Failed to get git remotes.")
 
-        for remote_info in stdout.splitlines():
+        for remote_info in result.stdout.splitlines():
             parts = remote_info.split()
             if len(parts) >= 2:
                 name, url = parts[0], parts[1]
@@ -134,11 +138,7 @@ class GitRepo:
         logger.info("Successfully retrieved git remotes")
 
     def init(self) -> None:
-        """Initializes a new Git repository at the local path.
-
-        Raises:
-            RuntimeError: If git init fails.
-        """
+        """Initializes a new Git repository at the local path."""
         logger.info("Initializing new git repo at %s", self.local_path)
 
         repo_path = Path(self.local_path)
@@ -167,14 +167,16 @@ class GitRepo:
         except ValueError as exception:
             logger.highlight(
                 level=LogLevel.ERROR,
-                message=f"Error in repository URL: {exception}",
+                message=f"Invalid repository URL: {self.url}",
             )
-            raise
+            raise exception
 
         logger.info("Cloning repo from %s on branch %s to %s", masked_pat_format_url, branch, self.local_path)
 
         cmd = ["git", "clone", "-b", branch, pat_format_url, self.local_path]
-        run_command(cmd)
+        result = run_command(cmd, log_on_errors=False, raise_on_errors=False)
+        if result.returncode != 0:
+            raise RuntimeError(f"Failed to clone repository from {masked_pat_format_url} to {self.local_path}.")
 
         self._set_config()
         self._get_remotes()
@@ -210,7 +212,9 @@ class GitRepo:
         logger.info("Setting git remote url for %s to %s", remote_name, new_url)
 
         cmd = ["git", "remote", "set-url", remote_name, new_url]
-        run_command(cmd, cwd=self.local_path)
+        result = run_command(cmd, cwd=self.local_path, log_on_errors=False, raise_on_errors=False)
+        if result.returncode != 0:
+            raise RuntimeError(f"Failed to set remote URL for {remote_name}.")
 
         self.remotes[remote_name] = new_url
         logger.info("Successfully set remote url for %s to %s", remote_name, new_url)
@@ -221,9 +225,6 @@ class GitRepo:
         Args:
             ref (str): The commit reference (SHA or branch name) to checkout.
             new_branch (bool): Whether to create a new branch.
-
-        Raises:
-            RuntimeError: If checkout fails.
         """
         logger.info("Checking out ref: %s (new_branch=%s)", ref, new_branch)
 
@@ -236,11 +237,7 @@ class GitRepo:
         logger.info("Successfully checked out ref: %s", ref)
 
     def add_all(self) -> None:
-        """Adds all changes to the Git staging area.
-
-        Raises:
-            RuntimeError: If adding changes fails.
-        """
+        """Adds all changes to the Git staging area."""
         logger.info("Adding all changes to git staging area")
 
         cmd = ["git", "add", "."]
@@ -260,7 +257,8 @@ class GitRepo:
         logger.info("Committing with message: %s", message)
 
         diff_cmd = ["git", "diff", "--cached", "--quiet"]
-        if get_exit_code(diff_cmd, cwd=self.local_path) == 0:
+        result = run_command(diff_cmd, cwd=self.local_path, log_on_errors=False, raise_on_errors=False)
+        if result.returncode == 0:
             raise RuntimeError("No changes to commit")
 
         commit_cmd = ["git", "commit", "-m", message]
@@ -286,7 +284,9 @@ class GitRepo:
             cmd.append("--rebase")
         cmd.append(remote_name)
         cmd.append(branch)
-        run_command(cmd, cwd=self.local_path)
+        result = run_command(cmd, cwd=self.local_path, log_on_errors=False, raise_on_errors=False)
+        if result.returncode != 0:
+            raise RuntimeError(f"Failed to pull from remote {remote_name} branch {branch}.")
 
         logger.info("Successfully pulled from remote %s branch %s", remote_name, branch)
 
@@ -305,6 +305,8 @@ class GitRepo:
         cmd = ["git", "push"]
         cmd.append(remote_name)
         cmd.append(branch)
-        run_command(cmd, cwd=self.local_path)
+        result = run_command(cmd, cwd=self.local_path, log_on_errors=False, raise_on_errors=False)
+        if result.returncode != 0:
+            raise RuntimeError(f"Failed to push to remote {remote_name} branch {branch}.")
 
         logger.info("Successfully pushed to remote %s branch %s", remote_name, branch)

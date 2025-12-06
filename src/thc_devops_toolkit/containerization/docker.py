@@ -24,7 +24,7 @@ from collections import deque
 from typing import Any
 
 from thc_devops_toolkit.observability import LogLevel, logger
-from thc_devops_toolkit.utils import run_command
+from thc_devops_toolkit.utils import CalledProcessError, run_command
 
 
 def docker_login(cr_host: str, username: str, password: str) -> None:
@@ -34,9 +34,6 @@ def docker_login(cr_host: str, username: str, password: str) -> None:
         cr_host (str): The Docker registry host.
         username (str): The username for authentication.
         password (str): The password for authentication.
-
-    Raises:
-        RuntimeError: If login fails.
     """
     logger.info("Logging in to Docker registry: %s with user: %s", cr_host, username)
     password = re.sub(r"\x1b\[[0-9;]*[A-Za-z~]", "", password)  # Clean ANSI escape codes
@@ -50,9 +47,6 @@ def docker_pull(full_image_name: str) -> None:
 
     Args:
         full_image_name (str): The full image name (including tag).
-
-    Raises:
-        RuntimeError: If pull fails.
     """
     logger.info("Pulling Docker image: %s", full_image_name)
     cmd = ["docker", "pull", full_image_name]
@@ -65,9 +59,6 @@ def docker_push(full_image_name: str) -> None:
 
     Args:
         full_image_name (str): The full image name (including tag).
-
-    Raises:
-        RuntimeError: If push fails.
     """
     logger.info("Pushing Docker image: %s", full_image_name)
     cmd = ["docker", "push", full_image_name]
@@ -89,10 +80,10 @@ def docker_inspect(target_object: str) -> dict[str, Any]:
     """
     logger.info("Inspecting Docker object: %s", target_object)
     cmd = ["docker", "inspect", target_object]
-    stdout = run_command(cmd, capture_output=True)
-    if stdout is None:
+    result = run_command(cmd, capture_output=True)
+    if not result.stdout:
         raise RuntimeError("No output captured from docker inspect command")
-    object_info: dict[str, Any] = json.loads(stdout)[0]
+    object_info: dict[str, Any] = json.loads(result.stdout)[0]
     return object_info
 
 
@@ -107,9 +98,6 @@ def docker_build(
         full_image_name (str): The full image name to tag.
         docker_file_path (str): Path to the Dockerfile.
         build_args (list[dict[str, Any]] | None): Build arguments as a list of dicts with 'key' and 'value'.
-
-    Raises:
-        RuntimeError: If build fails.
     """
     logger.info("Building Docker image: %s from %s", full_image_name, docker_file_path)
     cmd = ["docker", "build"]
@@ -132,9 +120,6 @@ def docker_tag(
     Args:
         source_full_image_name (str): The source image name.
         target_full_image_name (str): The target image name.
-
-    Raises:
-        RuntimeError: If tagging fails.
     """
     logger.info("Tagging Docker image: %s as %s", source_full_image_name, target_full_image_name)
     cmd = ["docker", "tag", source_full_image_name, target_full_image_name]
@@ -185,10 +170,10 @@ def docker_run_daemon(  # pylint: disable=too-many-arguments
     cmd.append(full_image_name)
     if command:
         cmd.extend(command)
-    stdout = run_command(cmd, capture_output=True)
-    if stdout is None:
+    result = run_command(cmd, capture_output=True)
+    if not result.stdout:
         raise RuntimeError("No output captured from docker run command")
-    container_id = stdout.strip()
+    container_id = result.stdout.strip()
     logger.info("Successfully started container: %s", container_id)
     return container_id
 
@@ -202,7 +187,7 @@ def docker_stop(obj: str, timeout: int = 10, poll_interval: float = 1.0) -> None
         poll_interval (float, optional): Seconds between status checks. Defaults to 1.0.
 
     Raises:
-        RuntimeError: If stop fails or container does not stop in time.
+        TimeoutError: If stop fails or container does not stop in time.
     """
     logger.info("Stopping Docker object: %s", obj)
     cmd = ["docker", "stop", obj]
@@ -223,7 +208,7 @@ def docker_stop(obj: str, timeout: int = 10, poll_interval: float = 1.0) -> None
                 level=LogLevel.ERROR,
                 message=f"Timeout waiting for container {obj} to stop",
             )
-            raise RuntimeError(f"Timeout waiting for container {obj} to stop")
+            raise TimeoutError(f"Timeout waiting for container {obj} to stop")
         time.sleep(poll_interval)
     logger.info("Successfully stopped Docker object: %s", obj)
 
@@ -238,15 +223,16 @@ def docker_remove(obj: str, ignore_errors: bool = False, timeout: int = 10, poll
         poll_interval (float, optional): Seconds between status checks. Defaults to 1.0.
 
     Raises:
-        RuntimeError: If remove fails and ignore_errors is False, or container not removed in time.
+        CalledProcessError: If remove fails and ignore_errors is False
+        TimeoutError: If container not removed in time and ignore_errors is False.
     """
     logger.info("Removing Docker container: %s", obj)
     cmd = ["docker", "rm", obj]
     try:
         run_command(cmd)
-    except RuntimeError:
+    except CalledProcessError as exception:
         if not ignore_errors:
-            raise
+            raise exception
         logger.info("Ignoring error while removing Docker container: %s", obj)
         return
     # Wait until container is actually removed
@@ -257,14 +243,14 @@ def docker_remove(obj: str, ignore_errors: bool = False, timeout: int = 10, poll
         except Exception:  # pylint: disable=broad-except
             # If inspect fails, container is gone
             break
+
         if time.time() - start > timeout:
-            logger.highlight(
-                level=LogLevel.ERROR,
-                message=f"Timeout waiting for container {obj} to be removed",
-            )
+            logger.highlight(level=LogLevel.ERROR, message=f"Timeout waiting for container {obj} to be removed")
+
             if not ignore_errors:
-                raise RuntimeError(f"Timeout waiting for container {obj} to be removed")
+                raise TimeoutError(f"Timeout waiting for container {obj} to be removed")
             break
+
         time.sleep(poll_interval)
     logger.info("Successfully removed Docker container: %s", obj)
 
@@ -274,9 +260,6 @@ def docker_remove_image(full_image_name: str) -> None:
 
     Args:
         full_image_name (str): The full image name.
-
-    Raises:
-        RuntimeError: If remove fails.
     """
     logger.info("Removing Docker image: %s", full_image_name)
     cmd = ["docker", "rmi", full_image_name]
@@ -290,9 +273,6 @@ def docker_copy(source: str, target: str) -> None:
     Args:
         source (str): Source path.
         target (str): Target path.
-
-    Raises:
-        RuntimeError: If copy fails.
     """
     logger.info("Copying from %s to %s", source, target)
     cmd = ["docker", "cp", source, target]
@@ -316,7 +296,6 @@ def docker_exec(
 
     Raises:
         ValueError: If command is not provided.
-        RuntimeError: If exec fails.
     """
     logger.info(
         "Executing command in Docker container: %s at %s: %s",
@@ -330,24 +309,15 @@ def docker_exec(
     if obj:
         cmd.append(obj)
     if not command:
-        logger.highlight(
-            level=LogLevel.ERROR,
-            message="Must pass command while docker exec",
-        )
+        logger.highlight(level=LogLevel.ERROR, message="Must pass command while docker exec")
         raise ValueError("Must pass command while docker exec")
     cmd.extend(command)
-    stdout = run_command(cmd, capture_output=True)
+    result = run_command(cmd, capture_output=True)
 
     # print output?
     if print_output:
-        if stdout is None:
-            raise RuntimeError("No output captured from docker exec command")
-
         logger.info("STDOUT from command %s at %s:%s", " ".join(command), obj, workdir)
-        logger.highlight(
-            level=LogLevel.INFO,
-            message=stdout,
-        )
+        logger.highlight(level=LogLevel.INFO, message=result.stdout)
 
 
 def get_image_digest(full_image_name: str, precision: int = 6) -> str:

@@ -99,9 +99,6 @@ def helm_login(cr_host: str, username: str, password: str) -> None:
         cr_host (str): The Helm registry host.
         username (str): The username for authentication.
         password (str): The password for authentication.
-
-    Raises:
-        RuntimeError: If login fails.
     """
     logger.info("Logging in to Helm registry: %s", cr_host)
     password = re.sub(r"\x1b\[[0-9;]*[A-Za-z~]", "", password)  # Clean ANSI escape codes
@@ -119,9 +116,6 @@ def helm_pull(remote_chart: str, version: str, untar: bool = False) -> None:
         remote_chart (str): The remote chart name.
         version (str): The chart version.
         untar (bool): Whether to untar the chart after pulling.
-
-    Raises:
-        RuntimeError: If pull fails.
     """
     logger.info("Pulling Helm chart %s with version %s", remote_chart, version)
     cmd = ["helm", "pull", remote_chart, "--version", version]
@@ -138,9 +132,6 @@ def helm_package(chart: Chart) -> None:
 
     Args:
         chart (Chart): The chart to package.
-
-    Raises:
-        RuntimeError: If packaging fails.
     """
     chart_path = str(Path(chart.path_prefix) / chart.name)
     logger.info("Packaging Helm chart at path: %s", chart_path)
@@ -157,9 +148,6 @@ def helm_push(chart: Chart, repository: str) -> None:
     Args:
         chart (Chart): The chart to push.
         repository (str): The repository to push to.
-
-    Raises:
-        RuntimeError: If push fails.
     """
     tgz_file = chart.name + "-" + chart.version + ".tgz"
     logger.info("Pushing Helm chart %s to repository: %s", tgz_file, repository)

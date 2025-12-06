@@ -48,9 +48,6 @@ def trivy_scan(cr_host: str, image_name: str, image_tag: str, output_file: str |
         image_name (str): The name of the image.
         image_tag (str): The tag of the image.
         output_file (str | Path): The output file path for the scan result.
-
-    Raises:
-        RuntimeError: If the Trivy scan fails.
     """
     full_image_name = f"{cr_host}/{image_name}:{image_tag}"
     output_file = str(Path(output_file).with_suffix(".json"))
@@ -68,8 +65,7 @@ def trivy_convert(input_path: str | Path, output_path: str | Path, template: str
         template (str | Path): Name of the template to use for conversion.
 
     Raises:
-        ValueError: If the template is not found.
-        RuntimeError: If the Trivy conversion fails.
+        FileNotFoundError: If the template is not found.
     """
     input_path = str(input_path)
     output_path = str(output_path)
@@ -93,9 +89,6 @@ def trivy_generate_sbom(cr_host: str, image_name: str, image_tag: str, output_fi
         image_name (str): The name of the image.
         image_tag (str): The tag of the image.
         output_file (str | Path): The output file path.
-
-    Raises:
-        RuntimeError: If the Trivy CLI fails.
     """
     full_image_name = f"{cr_host}/{image_name}:{image_tag}"
     output_file = str(Path(output_file).with_suffix(".json"))
