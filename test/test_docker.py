@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from thc_devops_toolkit.containerization import docker as docker_mod
+from thc_devops_toolkit.utils import CalledProcessError
 
 
 def _mock_inspect_output():
@@ -22,7 +23,7 @@ def test_docker_login_success(mock_run):
 @patch("subprocess.run")
 def test_docker_login_fail(mock_run):
     mock_run.return_value = MagicMock(returncode=1, stderr=b"fail")
-    with pytest.raises(RuntimeError):
+    with pytest.raises(CalledProcessError):
         docker_mod.docker_login("docker.io", "user", "pass")
 
 
@@ -38,7 +39,7 @@ def test_docker_pull_success(mock_run):
 @patch("subprocess.run")
 def test_docker_pull_fail(mock_run):
     mock_run.return_value = MagicMock(returncode=1, stderr=b"fail")
-    with pytest.raises(RuntimeError):
+    with pytest.raises(CalledProcessError):
         docker_mod.docker_pull("repo/image:tag")
 
 
@@ -54,7 +55,7 @@ def test_docker_push_success(mock_run):
 @patch("subprocess.run")
 def test_docker_push_fail(mock_run):
     mock_run.return_value = MagicMock(returncode=1, stderr=b"fail")
-    with pytest.raises(RuntimeError):
+    with pytest.raises(CalledProcessError):
         docker_mod.docker_push("repo/image:tag")
 
 
@@ -69,7 +70,7 @@ def test_docker_inspect_success(mock_run):
 @patch("subprocess.run")
 def test_docker_inspect_fail(mock_run):
     mock_run.return_value = MagicMock(returncode=1, stderr=b"fail")
-    with pytest.raises(RuntimeError):
+    with pytest.raises(CalledProcessError):
         docker_mod.docker_inspect("repo/image:tag")
 
 
@@ -88,7 +89,7 @@ def test_docker_build_success(mock_run):
 @patch("subprocess.run")
 def test_docker_build_fail(mock_run):
     mock_run.return_value = MagicMock(returncode=1, stderr=b"fail")
-    with pytest.raises(RuntimeError):
+    with pytest.raises(CalledProcessError):
         docker_mod.docker_build("repo/image:tag", "Dockerfile", None)
 
 
@@ -104,7 +105,7 @@ def test_docker_tag_success(mock_run):
 @patch("subprocess.run")
 def test_docker_tag_fail(mock_run):
     mock_run.return_value = MagicMock(returncode=1, stderr=b"fail")
-    with pytest.raises(RuntimeError):
+    with pytest.raises(CalledProcessError):
         docker_mod.docker_tag("repo/image:tag", "repo/image:newtag")
 
 
@@ -141,7 +142,7 @@ def test_docker_run_daemon_with_env_and_ports(mock_run):
 @patch("subprocess.run")
 def test_docker_run_daemon_fail(mock_run):
     mock_run.return_value = MagicMock(returncode=1, stderr=b"fail")
-    with pytest.raises(RuntimeError):
+    with pytest.raises(CalledProcessError):
         docker_mod.docker_run_daemon("repo/image:tag")
 
 
@@ -162,14 +163,14 @@ def test_docker_stop_success(mock_inspect, mock_run):
 def test_docker_stop_timeout(mock_inspect, mock_run):
     mock_run.return_value = MagicMock(returncode=0)
     mock_inspect.return_value = {"State": {"Status": "running"}}
-    with pytest.raises(RuntimeError):
+    with pytest.raises(TimeoutError):
         docker_mod.docker_stop("cname", timeout=0.05, poll_interval=0.01)
 
 
 @patch("subprocess.run")
 def test_docker_stop_fail(mock_run):
     mock_run.return_value = MagicMock(returncode=1, stderr=b"fail")
-    with pytest.raises(RuntimeError):
+    with pytest.raises(CalledProcessError):
         docker_mod.docker_stop("cname")
 
 
@@ -190,14 +191,14 @@ def test_docker_remove_success(mock_inspect, mock_run):
 def test_docker_remove_timeout(mock_inspect, mock_run):
     mock_run.return_value = MagicMock(returncode=0)
     mock_inspect.return_value = {}
-    with pytest.raises(RuntimeError):
+    with pytest.raises(TimeoutError):
         docker_mod.docker_remove("cname", timeout=0.05, poll_interval=0.01)
 
 
 @patch("subprocess.run")
 def test_docker_remove_fail(mock_run):
     mock_run.return_value = MagicMock(returncode=1, stderr=b"fail")
-    with pytest.raises(RuntimeError):
+    with pytest.raises(CalledProcessError):
         docker_mod.docker_remove("cname")
     # ignore_errors True should not raise
     docker_mod.docker_remove("cname", ignore_errors=True)
@@ -215,7 +216,7 @@ def test_docker_remove_image_success(mock_run):
 @patch("subprocess.run")
 def test_docker_remove_image_fail(mock_run):
     mock_run.return_value = MagicMock(returncode=1, stderr=b"fail")
-    with pytest.raises(RuntimeError):
+    with pytest.raises(CalledProcessError):
         docker_mod.docker_remove_image("repo/image:tag")
 
 
@@ -231,7 +232,7 @@ def test_docker_copy_success(mock_run):
 @patch("subprocess.run")
 def test_docker_copy_fail(mock_run):
     mock_run.return_value = MagicMock(returncode=1, stderr=b"fail")
-    with pytest.raises(RuntimeError):
+    with pytest.raises(CalledProcessError):
         docker_mod.docker_copy("src", "dst")
 
 
@@ -249,7 +250,7 @@ def test_docker_exec_success(mock_run):
 @patch("subprocess.run")
 def test_docker_exec_fail(mock_run):
     mock_run.return_value = MagicMock(returncode=1, stderr=b"fail")
-    with pytest.raises(RuntimeError):
+    with pytest.raises(CalledProcessError):
         docker_mod.docker_exec(command=["ls"], obj="cname")
 
 

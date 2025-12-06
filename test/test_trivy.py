@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 import thc_devops_toolkit.security.trivy.trivy as trivy_mod
+from thc_devops_toolkit.utils import CalledProcessError
 
 
 @pytest.fixture(scope="function")
@@ -69,7 +70,7 @@ def test_trivy_scan_failure(tmp_path):
         proc.returncode = 1
         proc.stderr = b"fail"
         run_mock.return_value = proc
-        with pytest.raises(RuntimeError):
+        with pytest.raises(CalledProcessError):
             trivy_mod.trivy_scan(cr_host=cr_host, image_name=image_name, image_tag=image_tag, output_file=output_file)
 
 
@@ -105,7 +106,7 @@ def test_trivy_convert_failure():
         proc.stderr = b"fail"
         run_mock.return_value = proc
         tpl_mock.return_value = "@/some/path.tpl"
-        with pytest.raises(RuntimeError):
+        with pytest.raises(CalledProcessError):
             trivy_mod.trivy_convert("in.json", "out.txt", "tpl")
 
 
@@ -142,5 +143,5 @@ def test_trivy_generate_sbom_failure(tmp_path):
         proc.returncode = 1
         proc.stderr = b"fail"
         run_mock.return_value = proc
-        with pytest.raises(RuntimeError):
+        with pytest.raises(CalledProcessError):
             trivy_mod.trivy_generate_sbom(cr_host=cr_host, image_name=image_name, image_tag=image_tag, output_file=output_file)
