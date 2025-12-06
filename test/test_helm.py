@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from thc_devops_toolkit.containerization import helm as helm_mod
+from thc_devops_toolkit.utils import CalledProcessError
 
 
 class DummyChart(helm_mod.Chart):
@@ -22,7 +23,7 @@ def test_helm_login_fail():
     with patch("subprocess.run") as run_mock:
         run_mock.return_value.returncode = 1
         run_mock.return_value.stderr = b"fail"
-        with pytest.raises(RuntimeError):
+        with pytest.raises(CalledProcessError):
             helm_mod.helm_login("host", "user", "pass")
 
 
@@ -37,7 +38,7 @@ def test_helm_pull_fail():
     with patch("subprocess.run") as run_mock:
         run_mock.return_value.returncode = 1
         run_mock.return_value.stderr = b"fail"
-        with pytest.raises(RuntimeError):
+        with pytest.raises(CalledProcessError):
             helm_mod.helm_pull("chart", "1.0.0")
 
 
@@ -54,7 +55,7 @@ def test_helm_package_fail():
     with patch("subprocess.run") as run_mock:
         run_mock.return_value.returncode = 1
         run_mock.return_value.stderr = b"fail"
-        with pytest.raises(RuntimeError):
+        with pytest.raises(CalledProcessError):
             helm_mod.helm_package(chart)
 
 
@@ -71,7 +72,7 @@ def test_helm_push_fail():
     with patch("subprocess.run") as run_mock:
         run_mock.return_value.returncode = 1
         run_mock.return_value.stderr = b"fail"
-        with pytest.raises(RuntimeError):
+        with pytest.raises(CalledProcessError):
             helm_mod.helm_push(chart, "repo")
 
 

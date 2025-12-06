@@ -1,22 +1,33 @@
 """Utility functions for running subprocess commands."""
 
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
+from subprocess import CalledProcessError
 
 from thc_devops_toolkit.observability import LogLevel, logger
 
 
-def _decode(value: str | bytes | None) -> str | None:
+@dataclass
+class SubprocessResult:
+    """Dataclass to hold subprocess command results."""
+
+    stdout: str
+    stderr: str
+    returncode: int
+
+
+def _decode(value: str | bytes | None) -> str:
     """Decode bytes to string if necessary.
 
     Args:
         value: The value to decode.
 
     Returns:
-        The decoded string or None.
+        The decoded string.
     """
     if value is None:
-        return None
+        return ""
 
     if isinstance(value, bytes):
         return value.decode("utf-8")
@@ -28,53 +39,58 @@ def run_command(  # pylint: disable=too-many-arguments
     input_: bytes | None = None,
     capture_output: bool = False,
     cwd: str | Path | None = None,
-    check: bool = False,
     env: dict[str, str] | None = None,
-) -> str | None:
+    log_on_errors: bool = True,
+    raise_on_errors: bool = True,
+) -> SubprocessResult:
     """Run a system command with optional input and output capture.
 
     Args:
         cmd: The command to run as a list of strings.
         input_: Optional input to pass to the command's stdin.
-        capture_output: Whether to capture the command's stdout.
+        capture_output: Whether to capture stdout and stderr.
         cwd: The working directory to run the command in.
-        check: Whether to raise an error on non-zero exit codes.
         env: Optional environment variables to set for the command.
+        log_on_errors: Whether to log errors if the command fails.
+        raise_on_errors: Whether to raise an exception if the command fails.
 
     Returns:
-        The captured stdout as a string if capture_output is True, otherwise None.
+        A SubprocessResult object containing stdout, stderr, and the return code.
 
     Raises:
-        RuntimeError: If the command fails and check is False.
+        CalledProcessError: If the command fails and raise_on_errors is True.
     """
-    process = subprocess.run(cmd, input=input_, capture_output=capture_output, cwd=cwd, check=check, env=env)
+    process = subprocess.run(cmd, input=input_, capture_output=capture_output, cwd=cwd, check=False, env=env)
 
-    if (not check) and (process.returncode != 0):
+    result = SubprocessResult(
+        stdout=_decode(process.stdout),
+        stderr=_decode(process.stderr),
+        returncode=process.returncode,
+    )
+
+    # Run commands with log_on_error=False if they contain sensitive information
+    # Or sensitive information might be logged here if the command fails
+    if result.returncode != 0 and log_on_errors:
         logger.highlight(
             level=LogLevel.ERROR,
             message=(
-                f"Command '{' '.join(cmd)}' failed with exit code {process.returncode}\n"
-                f"STDOUT: {_decode(process.stdout)}\n"
-                f"STDERR: {_decode(process.stderr)}"
+                f"Command '{' '.join(cmd)}' failed with exit code {result.returncode}\n"
+                f"STDOUT: {result.stdout}\n"
+                f"STDERR: {result.stderr}"
             ),
         )
-        raise RuntimeError(f"Command '{' '.join(cmd)}' failed with exit code {process.returncode}")
 
-    if capture_output:
-        return _decode(process.stdout)
-    return None
+    if result.returncode != 0 and raise_on_errors:
+        raise CalledProcessError(
+            returncode=result.returncode,
+            cmd=cmd,
+            output=result.stdout,
+            stderr=result.stderr,
+        )
+
+    return result
 
 
-def get_exit_code(cmd: list[str], input_: bytes | None = None, cwd: str | Path | None = None) -> int:
-    """Run a system command and return its exit code.
-
-    Args:
-        cmd: The command to run as a list of strings.
-        input_: Optional input to pass to the command's stdin.
-        cwd: The working directory to run the command in.
-
-    Returns:
-        The command's exit code.
-    """
-    process = subprocess.run(cmd, input=input_, capture_output=False, cwd=cwd, check=False)
-    return process.returncode
+__all__ = [
+    "CalledProcessError",
+]
